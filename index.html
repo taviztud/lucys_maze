@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Lucy's Maze</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+</head>
+
+<body>
+    <div id="game-container"></div>
+    <div id="info-container">
+        <div id="score">Puntos: 0</div>
+        <div id="level">Nivel: 1</div>
+        <button id="restart-button">Comenzar nuevamente</button>
+    </div>
+    <div id="audio-controls">
+        <button id="prev-music">Anterior</button>
+        <button id="toggle-music">Música Off</button>
+        <button id="next-music">Siguiente</button>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5">
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>
