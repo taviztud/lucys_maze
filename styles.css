@@ -1,0 +1,142 @@
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    font-family: 'Press Start 2P', cursive;
+    background-color: #050505;
+    color: #e0e0e0;
+    height: 100vh;
+    padding: 16px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+#game-container {
+    display: flex;
+    width: min(600px, 90vw);
+    height: min(600px, 90vw);
+    border: 4px solid #2c3e50;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    box-shadow:
+        0 0 10px #00f,
+        0 0 20px #00f,
+        inset 0 0 20px rgba(0, 0, 0, 0.8);
+    overflow: hidden;
+    position: relative;
+    background-color: #000;
+}
+
+#info-container {
+    text-align: center;
+    color: #ffcc00;
+    background-color: #111;
+    padding: 15px;
+    border: 2px solid #ffcc00;
+    border-radius: 4px;
+    margin-top: 10px;
+    font-size: 12px;
+    width: min(400px, 90vw);
+    box-shadow: 0 0 10px rgba(255, 204, 0, 0.3);
+    text-transform: uppercase;
+    line-height: 2;
+}
+
+#score,
+#level {
+    text-shadow: 2px 2px 0px #000;
+}
+
+button {
+    font-family: 'Press Start 2P', cursive;
+    text-transform: uppercase;
+    border: 2px solid #fff;
+    background-color: #000;
+    color: #fff;
+    padding: 10px 15px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.1s;
+    box-shadow: 4px 4px 0px #444;
+    margin: 5px;
+}
+
+button:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px #444;
+}
+
+button:hover {
+    background-color: #222;
+    color: #0ff;
+    border-color: #0ff;
+}
+
+#restart-button {
+    background-color: #c00;
+    border-color: #f00;
+    box-shadow: 4px 4px 0px #600;
+    margin-top: 10px;
+}
+
+#restart-button:hover {
+    background-color: #f00;
+    color: #ff0;
+    border-color: #ff0;
+}
+
+#audio-controls {
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+#toggle-music {
+    color: #0f0;
+    border-color: #0f0;
+}
+
+/* CRT Scanline Effect */
+body::after {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    z-index: 100;
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
+}
+
+/* Custom Range Slider */
+input[type=range] {
+    -webkit-appearance: none;
+    width: 100px;
+    background: transparent;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 16px;
+    width: 16px;
+    background: #0ff;
+    cursor: pointer;
+    margin-top: -6px;
+    box-shadow: 2px 2px 0px #008;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    cursor: pointer;
+    background: #444;
+    border: 1px solid #888;
+}

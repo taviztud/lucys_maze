@@ -3,9 +3,16 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Lucy's Maze</title>
+    <link rel="icon" type="image/png" href="lucy.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.js"
+        integrity="sha384-w29CycMuv0VdGqa+b71HHpK02Y18KZHvrPUxzSAqo8IhtCbeHBuf1Vo6JvEiGkt8"
+        crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -21,7 +28,7 @@
         <button id="next-music">Siguiente</button>
         <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5">
     </div>
-    <script src="script.js"></script>
+    <script type="module" src="src/main.js"></script>
 </body>
 
 </html>
