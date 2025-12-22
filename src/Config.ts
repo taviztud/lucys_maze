@@ -1,4 +1,6 @@
-export const CONFIG = {
+import type { GameConfig } from './types/game.types';
+
+export const CONFIG: GameConfig = {
     // Configuración del juego
     GAME_WIDTH: 600,
     GAME_HEIGHT: 600,
@@ -17,7 +19,7 @@ export const CONFIG = {
     // Configuración de música y audio
     AUDIO: {
         DEFAULT_VOLUME: 0.5,
-        MAX_BG_TRACKS: 14 // Limitar detección a 14 pistas por ahora
+        MAX_BG_TRACKS: 14
     },
 
     // UI y efectos visuales
@@ -29,12 +31,12 @@ export const CONFIG = {
         EXIT_BLINK_ALPHA_LOW: 0.3,
         EXIT_BLINK_INTERVAL: 200,
         FONT_FAMILY: '"Press Start 2P", cursive',
-        MAIN_BACKGROUND_COLOR: '#1e1e2e' // Softer dark blue/gray
+        MAIN_BACKGROUND_COLOR: '#1e1e2e'
     },
 
-    // Colores de NEÓN por nivel (Cyan, Magenta, Lime, Yellow, Purple) - Tonos más suaves
+    // Colores de NEÓN por nivel
     BACKGROUND_COLORS: [0x4CC9F0, 0xF72585, 0x4AD66D, 0xF4D35E, 0x7209B7],
-    GRID_ALPHA: 0.15, // Más sutil
+    GRID_ALPHA: 0.15,
 
     // Configuración de enemigos
     ENEMIES: {

@@ -1,0 +1,25 @@
+{
+  "name": "lucys-maze",
+  "version": "0.1.2",
+  "description": "Lucy's Maze - Un juego estilo Tomb of the Mask con Phaser 3",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "phaser",
+    "game",
+    "maze",
+    "typescript"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  }
+}

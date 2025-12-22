@@ -1,55 +1,62 @@
+import Phaser from 'phaser';
+import type { Position } from '../types/game.types';
+
 /**
  * Calcula la escala óptima para un sprite basado en el tamaño de celda
- * Elimina duplicación de código en escalado de sprites
- * @param {string} textureKey - Clave de la textura en Phaser
- * @param {number} targetSize - Tamaño objetivo (generalmente cellSize)
- * @param {object} scene - Escena de Phaser para acceder a texturas
- * @returns {number} - Factor de escala calculado
+ * @param textureKey - Clave de la textura en Phaser
+ * @param targetSize - Tamaño objetivo (generalmente cellSize)
+ * @param scene - Escena de Phaser para acceder a texturas
+ * @returns Factor de escala calculado
  */
-export function calculateSpriteScale(textureKey, targetSize, scene) {
+export function calculateSpriteScale(
+    textureKey: string,
+    targetSize: number,
+    scene: Phaser.Scene
+): number {
     try {
         if (!scene || !scene.textures || !scene.textures.get(textureKey)) {
             console.warn(`calculateSpriteScale: Invalid texture key "${textureKey}"`);
-            return 1; // Escala por defecto
+            return 1;
         }
 
         const texture = scene.textures.get(textureKey);
-        const sourceImage = texture.getSourceImage();
+        const sourceImage = texture.getSourceImage() as HTMLImageElement;
         const originalWidth = sourceImage.width;
         const originalHeight = sourceImage.height;
 
         return Math.min(targetSize / originalWidth, targetSize / originalHeight);
     } catch (error) {
         console.error('Error calculating sprite scale:', error);
-        return 1; // Escala por defecto en caso de error
+        return 1;
     }
 }
 
 /**
  * Valida que las coordenadas estén dentro de los límites del tablero
- * @param {number} x - Coordenada X
- * @param {number} y - Coordenada Y
- * @param {number} boardSize - Tamaño del tablero
- * @returns {boolean} - True si las coordenadas son válidas
+ * @param x - Coordenada X
+ * @param y - Coordenada Y
+ * @param boardSize - Tamaño del tablero
+ * @returns True si las coordenadas son válidas
  */
-export function isValidPosition(x, y, boardSize) {
+export function isValidPosition(x: number, y: number, boardSize: number): boolean {
     return x >= 0 && x < boardSize && y >= 0 && y < boardSize;
 }
 
 /**
  * Genera una posición aleatoria libre en el tablero
- * @param {Array} excludePositions - Array de posiciones a excluir
- * @param {number} boardSize - Tamaño del tablero
- * @returns {Object} - {x, y} posición libre o null si no se encuentra
+ * @param excludePositions - Array de posiciones a excluir
+ * @param boardSize - Tamaño del tablero
+ * @returns Posición libre o null si no se encuentra
  */
-export function generateFreePosition(excludePositions = [], boardSize) {
-    // Validación de input
+export function generateFreePosition(
+    excludePositions: Position[] = [],
+    boardSize: number
+): Position | null {
     if (!Array.isArray(excludePositions)) {
         console.warn('generateFreePosition: excludePositions must be an array');
         excludePositions = [];
     }
 
-    // Validación de boardSize
     if (!boardSize || boardSize < 1) {
         console.error('generateFreePosition: Invalid boardSize:', boardSize);
         return null;
@@ -59,14 +66,13 @@ export function generateFreePosition(excludePositions = [], boardSize) {
     let attempts = 0;
 
     while (attempts < maxAttempts) {
-        const position = {
+        const position: Position = {
             x: Math.floor(Math.random() * boardSize),
             y: Math.floor(Math.random() * boardSize)
         };
 
-        // Verificar si la posición está libre
-        const isOccupied = excludePositions.some(pos =>
-            pos.x === position.x && pos.y === position.y
+        const isOccupied = excludePositions.some(
+            pos => pos.x === position.x && pos.y === position.y
         );
 
         if (!isOccupied) {

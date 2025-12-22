@@ -1,99 +1,114 @@
+/* Lucy's Maze - Arcade-style Responsive Layout */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #050505;
+    font-family: 'Press Start 2P', cursive;
+}
+
 body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    margin: 0;
-    font-family: 'Press Start 2P', cursive;
-    background-color: #050505;
-    color: #e0e0e0;
-    height: 100vh;
-    padding: 16px;
-    box-sizing: border-box;
-    overflow: hidden;
+    justify-content: space-between;
+    padding: 8px;
+    min-height: 100vh;
+    min-height: 100dvh;
 }
 
-#game-container {
+/* TOP: Info bar - arcade style */
+#info-bar {
     display: flex;
-    width: min(600px, 90vw);
-    height: min(600px, 90vw);
-    border: 4px solid #2c3e50;
-    border-radius: 4px;
-    margin-bottom: 20px;
-    box-shadow:
-        0 0 10px #00f,
-        0 0 20px #00f,
-        inset 0 0 20px rgba(0, 0, 0, 0.8);
-    overflow: hidden;
-    position: relative;
-    background-color: #000;
-}
-
-#info-container {
-    text-align: center;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
     color: #ffcc00;
-    background-color: #111;
-    padding: 15px;
+    background: linear-gradient(180deg, #222 0%, #111 100%);
+    padding: 8px 15px;
     border: 2px solid #ffcc00;
     border-radius: 4px;
-    margin-top: 10px;
-    font-size: 12px;
-    width: min(400px, 90vw);
-    box-shadow: 0 0 10px rgba(255, 204, 0, 0.3);
+    font-size: 10px;
     text-transform: uppercase;
-    line-height: 2;
+    box-shadow: 0 0 10px rgba(255, 204, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+    width: 100%;
+    max-width: 400px;
 }
 
 #score,
 #level {
-    text-shadow: 2px 2px 0px #000;
+    text-shadow: 2px 2px 0 #000;
 }
 
+/* CENTER: Game container */
+#game-container {
+    width: calc(100vw - 16px);
+    height: calc(100vw - 16px);
+    max-width: 600px;
+    max-height: min(600px, calc(100vh - 130px));
+    border: 4px solid #2c3e50;
+    border-radius: 4px;
+    box-shadow: 0 0 15px #00f, 0 0 30px #00f, inset 0 0 15px rgba(0, 0, 0, 0.8);
+    background: #000;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* BOTTOM: Audio controls */
+#audio-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(180deg, #111 0%, #0a0a0a 100%);
+    padding: 8px 16px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+/* Buttons */
 button {
     font-family: 'Press Start 2P', cursive;
-    text-transform: uppercase;
-    border: 2px solid #fff;
-    background-color: #000;
+    background: #000;
     color: #fff;
-    padding: 10px 15px;
+    border: 2px solid #fff;
+    padding: 6px 10px;
     font-size: 10px;
     cursor: pointer;
+    box-shadow: 2px 2px 0 #444;
     transition: all 0.1s;
-    box-shadow: 4px 4px 0px #444;
-    margin: 5px;
 }
 
 button:active {
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0px #444;
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 #444;
 }
 
 button:hover {
-    background-color: #222;
+    background: #222;
     color: #0ff;
     border-color: #0ff;
 }
 
 #restart-button {
-    background-color: #c00;
-    border-color: #f00;
-    box-shadow: 4px 4px 0px #600;
-    margin-top: 10px;
+    background: #600;
+    border-color: #f44;
+    color: #f44;
+    padding: 6px 8px;
 }
 
 #restart-button:hover {
-    background-color: #f00;
+    background: #900;
     color: #ff0;
-    border-color: #ff0;
-}
-
-#audio-controls {
-    margin-top: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: center;
 }
 
 #toggle-music {
@@ -101,42 +116,68 @@ button:hover {
     border-color: #0f0;
 }
 
-/* CRT Scanline Effect */
-body::after {
-    content: " ";
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
-    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-    z-index: 100;
-    background-size: 100% 2px, 3px 100%;
-    pointer-events: none;
+#audio-controls button {
+    padding: 6px 10px;
+    font-size: 12px;
 }
 
-/* Custom Range Slider */
+/* Volume slider */
 input[type=range] {
     -webkit-appearance: none;
-    width: 100px;
+    appearance: none;
+    width: 60px;
     background: transparent;
 }
 
 input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    height: 16px;
-    width: 16px;
+    width: 14px;
+    height: 14px;
     background: #0ff;
     cursor: pointer;
-    margin-top: -6px;
-    box-shadow: 2px 2px 0px #008;
+    margin-top: -5px;
+    border-radius: 2px;
 }
 
 input[type=range]::-webkit-slider-runnable-track {
-    width: 100%;
     height: 4px;
-    cursor: pointer;
     background: #444;
-    border: 1px solid #888;
+    border: 1px solid #666;
+}
+
+/* CRT scanline effect */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%);
+    background-size: 100% 2px;
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* Desktop */
+@media (min-width: 640px) {
+    body {
+        padding: 16px;
+    }
+
+    #info-bar {
+        font-size: 12px;
+        padding: 10px 24px;
+        gap: 24px;
+    }
+
+    #audio-controls {
+        gap: 12px;
+        padding: 10px 20px;
+    }
+
+    #audio-controls button {
+        padding: 8px 14px;
+    }
+
+    input[type=range] {
+        width: 100px;
+    }
 }

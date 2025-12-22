@@ -1,11 +1,75 @@
-import { CONFIG } from '../Config.js';
-import { calculateSpriteScale, generateFreePosition, isValidPosition } from '../utils/Utils.js';
+import Phaser from 'phaser';
+import { CONFIG } from '../Config';
+import { calculateSpriteScale, generateFreePosition } from '../utils/Utils';
+import { ScoreManager } from '../managers/ScoreManager';
+import type { Position, Direction, Obstacle, Enemy, SpriteCache, EventListenerEntry, MoveResult, FinalDestination, GridSprite } from '../types/game.types';
 
 export class GameScene extends Phaser.Scene {
+    // State variables
+    private boardSize: number;
+    private cellSize: number;
+    private playerPosition: Position;
+    private exitPosition: Position;
+    private coins: Position[];
+    private obstacles: Obstacle[];
+    private traps: Position[];
+    private saves: Position[];
+    private enemies: Enemy[];
+    private score: number;
+    private level: number;
+    private gameOver: boolean;
+    private moving: boolean;
+    private moveDirection: Direction;
+    private desiredDirection: Direction;
+    private playerMoveTween: Phaser.Tweens.Tween | null;
+    private exitBlinkState: boolean;
+    private requireFreshPressAfterReset: boolean;
+    private initialCoinCount: number;
+
+    // Audio state
+    private availableMusicKeys: string[];
+    private backgroundMusic: Phaser.Sound.BaseSound | null;
+    private musicPlaylistOrder: string[];
+    private currentPlaylistIndex: number;
+
+    // Optimization
+    private collisionMap: any;
+    private lastEnemyUpdateTime: number;
+    private canUseSave: boolean;
+    private spriteCache: SpriteCache;
+    private eventListenerCleanup: EventListenerEntry[];
+
+    // Juice
+    private coinParticles: Phaser.GameObjects.Particles.ParticleEmitter | null;
+    private trailParticles: Phaser.GameObjects.Particles.ParticleEmitter | null;
+
+    // Game Objects
+    private player: Phaser.GameObjects.Sprite;
+    private exit: Phaser.GameObjects.Sprite;
+    private scoreText: Phaser.GameObjects.Text;
+    private levelText: Phaser.GameObjects.Text;
+    private newRecordText: Phaser.GameObjects.Text;
+    private menuText: Phaser.GameObjects.Text;
+    private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
+    private restartKey: Phaser.Input.Keyboard.Key;
+    private menuKey: Phaser.Input.Keyboard.Key;
+    private exitBlinkTimer: Phaser.Time.TimerEvent;
+
+    // Visuals
+    private gridGroup: Phaser.GameObjects.Group;
+    private coinSprites: GridSprite[];
+    private obstacleSprites: Phaser.GameObjects.Sprite[];
+    private trapSprites: Phaser.GameObjects.Sprite[];
+    private playerSprite: Phaser.GameObjects.Sprite;
+    private exitSprite: Phaser.GameObjects.Sprite;
+    private saveSprite: Phaser.GameObjects.Sprite;
+    private playerDieSprite: Phaser.GameObjects.Sprite;
+    private savePulseTween: Phaser.Tweens.Tween;
+    private gameOverText: Phaser.GameObjects.Text;
+    private restartText: Phaser.GameObjects.Text;
+
     constructor() {
         super('GameScene');
-
-        // State variables
         this.boardSize = CONFIG.BOARD_SIZE;
         this.cellSize = CONFIG.CELL_SIZE;
         this.playerPosition = { x: 0, y: 0 };
@@ -34,6 +98,8 @@ export class GameScene extends Phaser.Scene {
 
         // Optimization
         this.collisionMap = null;
+        this.lastEnemyUpdateTime = 0;
+        this.canUseSave = false;
         this.spriteCache = {
             coins: [],
             obstacles: [],
@@ -69,6 +135,7 @@ export class GameScene extends Phaser.Scene {
 
             // Load images
             this.load.image('player_stand', 'lucy_stand.png');
+            // ... (rest of images)
             this.load.image('player_run', 'lucy_run.png');
             this.load.image('player_die', 'lucy_die.png');
             this.load.image('coin', 'tuto.png');
@@ -135,7 +202,7 @@ export class GameScene extends Phaser.Scene {
         this.gameOverText = this.add.text(CONFIG.GAME_WIDTH / 2, CONFIG.GAME_HEIGHT / 2, 'GAME OVER', {
             fontSize: CONFIG.UI.GAME_OVER_FONT_SIZE,
             fontFamily: CONFIG.UI.FONT_FAMILY,
-            fill: '#ff0000',
+            color: '#ff0000',
             stroke: '#ffffff',
             strokeThickness: 4
         });
@@ -146,7 +213,7 @@ export class GameScene extends Phaser.Scene {
         this.restartText = this.add.text(CONFIG.GAME_WIDTH / 2, CONFIG.GAME_HEIGHT / 2 + CONFIG.UI.RESTART_OFFSET_Y, 'PRESS R TO RESTART', {
             fontSize: CONFIG.UI.RESTART_FONT_SIZE,
             fontFamily: CONFIG.UI.FONT_FAMILY,
-            fill: '#ffff00',
+            color: '#ffff00',
             align: 'center'
         });
         this.restartText.setOrigin(0.5);
@@ -164,6 +231,7 @@ export class GameScene extends Phaser.Scene {
         // Controls
         this.cursors = this.input.keyboard.createCursorKeys();
         this.restartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+        this.menuKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
 
         // Exit blink
         this.time.addEvent({
@@ -201,6 +269,9 @@ export class GameScene extends Phaser.Scene {
             }
         });
 
+        // Touch/Swipe controls for mobile
+        this.setupTouchControls();
+
         this.updateScoreAndLevelTexts();
 
         if (this.level >= 5) {
@@ -235,6 +306,9 @@ export class GameScene extends Phaser.Scene {
                 this.level = 1;
                 this.updateScoreAndLevelTexts();
                 this.resetGame(true);
+            }
+            if (Phaser.Input.Keyboard.JustDown(this.menuKey)) {
+                this.returnToMenu();
             }
             return;
         }
@@ -324,7 +398,7 @@ export class GameScene extends Phaser.Scene {
                         if ((x !== 0 || y !== 0) && (x !== this.exitPosition.x || y !== this.exitPosition.y)) {
                             if (Math.random() < CONFIG.MAZE_GENERATION.OBSTACLE_PROBABILITY && this.hasEnoughSpace(x, y)) {
                                 const obstacleTypes = ['brick', 'rock', 'tree'];
-                                const randomType = obstacleTypes[Phaser.Math.Between(0, obstacleTypes.length - 1)];
+                                const randomType = obstacleTypes[Phaser.Math.Between(0, obstacleTypes.length - 1)] as 'brick' | 'rock' | 'tree';
                                 this.obstacles.push({ x, y, type: randomType });
                             } else if (Math.random() < CONFIG.MAZE_GENERATION.COIN_PROBABILITY) {
                                 this.coins.push({ x, y });
@@ -481,7 +555,7 @@ export class GameScene extends Phaser.Scene {
         this.coinSprites = [];
         this.coins.forEach((coin, index) => {
             let coinSprite;
-            if (this.spriteCache.coins[index] && !this.spriteCache.coins[index].destroyed) {
+            if (this.spriteCache.coins[index] && this.spriteCache.coins[index].active) {
                 coinSprite = this.spriteCache.coins[index];
                 coinSprite.setPosition(
                     coin.x * this.cellSize + this.cellSize / 2,
@@ -499,16 +573,16 @@ export class GameScene extends Phaser.Scene {
                 this.spriteCache.coins[index] = coinSprite;
             }
             // Store grid position for easy removal
-            coinSprite.gridX = coin.x;
-            coinSprite.gridY = coin.y;
-            this.coinSprites.push(coinSprite);
+            (coinSprite as GridSprite).gridX = coin.x;
+            (coinSprite as GridSprite).gridY = coin.y;
+            this.coinSprites.push(coinSprite as GridSprite);
         });
 
         // Draw Obstacles
         this.obstacleSprites = [];
         this.obstacles.forEach((obstacle, index) => {
             let obstacleSprite;
-            if (this.spriteCache.obstacles[index] && !this.spriteCache.obstacles[index].destroyed) {
+            if (this.spriteCache.obstacles[index] && this.spriteCache.obstacles[index].active) {
                 obstacleSprite = this.spriteCache.obstacles[index];
                 obstacleSprite.setPosition(
                     obstacle.x * this.cellSize + this.cellSize / 2,
@@ -533,7 +607,7 @@ export class GameScene extends Phaser.Scene {
         this.trapSprites = [];
         this.traps.forEach((trap, index) => {
             let trapSprite;
-            if (this.spriteCache.traps[index] && !this.spriteCache.traps[index].destroyed) {
+            if (this.spriteCache.traps[index] && this.spriteCache.traps[index].active) {
                 trapSprite = this.spriteCache.traps[index];
                 trapSprite.setPosition(
                     trap.x * this.cellSize + this.cellSize / 2,
@@ -618,59 +692,78 @@ export class GameScene extends Phaser.Scene {
         const moveResult = this.calculateMoveUntilObstacle(this.playerPosition.x, this.playerPosition.y, dx, dy);
 
         if (moveResult.distance === 0) {
-            this.moveDirection = { dx: 0, dy: 0 };
-            if (this.playerSprite) {
-                this.playerSprite.setTexture('player_stand');
-                this.adjustPlayerScaleAndRotation();
-            }
+            this.resetMovementState();
             return;
         }
 
+        this.startMovement();
+        const baseStepDuration = this.calculateStepDuration();
+        const finalDestination = this.calculateFinalDestination(dx, dy, moveResult);
+
+        this.executeMovementTween(dx, dy, baseStepDuration, finalDestination);
+    }
+
+    // Helper: Reset movement state when no movement possible
+    resetMovementState() {
+        this.moveDirection = { dx: 0, dy: 0 };
+        if (this.playerSprite) {
+            this.playerSprite.setTexture('player_stand');
+            this.adjustPlayerScaleAndRotation();
+        }
+    }
+
+    // Helper: Initialize movement state
+    startMovement() {
         this.moving = true;
         this.playerSprite.setTexture('player_run');
         this.adjustPlayerScaleAndRotation();
 
-        const baseStepDuration = Math.max(
-            CONFIG.PERFORMANCE.PLAYER_MIN_STEP_DURATION_MS,
-            CONFIG.PERFORMANCE.PLAYER_BASE_DURATION_MS - this.level * CONFIG.PERFORMANCE.PLAYER_STEP_DEC_PER_LEVEL
-        );
-        const actualDuration = baseStepDuration * moveResult.distance;
-
-        // Trail effect
         if (this.trailParticles) {
             this.trailParticles.start();
             this.trailParticles.follow = this.playerSprite;
         }
+    }
 
-        let lastStepProcessed = -1;
+    // Helper: Calculate step duration based on level
+    calculateStepDuration() {
+        return Math.max(
+            CONFIG.PERFORMANCE.PLAYER_MIN_STEP_DURATION_MS,
+            CONFIG.PERFORMANCE.PLAYER_BASE_DURATION_MS - this.level * CONFIG.PERFORMANCE.PLAYER_STEP_DEC_PER_LEVEL
+        );
+    }
+
+    // Helper: Find the actual destination considering traps, enemies, exit
+    calculateFinalDestination(dx, dy, moveResult) {
         const startX = this.playerPosition.x;
         const startY = this.playerPosition.y;
         const finalDestination = { x: moveResult.x, y: moveResult.y, step: moveResult.distance };
 
-        // Check for stops along the way (traps, enemies, exit)
         for (let i = 1; i <= moveResult.distance; i++) {
             const checkX = startX + (dx * i);
             const checkY = startY + (dy * i);
 
+            // Stop at trap
             if (this.isTrapOptimized(checkX, checkY)) {
-                finalDestination.x = checkX;
-                finalDestination.y = checkY;
-                finalDestination.step = i;
-                break;
+                return { x: checkX, y: checkY, step: i };
             }
+            // Stop at enemy
             if (this.enemies.some(e => Math.round(e.x) === checkX && Math.round(e.y) === checkY)) {
-                finalDestination.x = checkX;
-                finalDestination.y = checkY;
-                finalDestination.step = i;
-                break;
+                return { x: checkX, y: checkY, step: i };
             }
+            // Stop at exit
             if (checkX === this.exitPosition.x && checkY === this.exitPosition.y) {
-                finalDestination.x = checkX;
-                finalDestination.y = checkY;
-                finalDestination.step = i;
-                break;
+                return { x: checkX, y: checkY, step: i };
             }
         }
+
+        return finalDestination;
+    }
+
+    // Helper: Execute the movement tween
+    executeMovementTween(dx, dy, baseStepDuration, finalDestination) {
+        const startX = this.playerPosition.x;
+        const startY = this.playerPosition.y;
+        let lastStepProcessed = -1;
 
         this.playerMoveTween = this.tweens.add({
             targets: this.playerSprite,
@@ -679,84 +772,105 @@ export class GameScene extends Phaser.Scene {
             duration: baseStepDuration * finalDestination.step,
             ease: 'Linear',
             onUpdate: (tween) => {
-                const progress = tween.progress;
-                const currentStep = Math.floor(progress * finalDestination.step);
-                const stepStart = Math.max(0, lastStepProcessed + 1);
-
-                for (let step = stepStart; step <= currentStep; step++) {
-                    const newLogicalX = startX + (dx * step);
-                    const newLogicalY = startY + (dy * step);
-
-                    if (newLogicalX !== this.playerPosition.x || newLogicalY !== this.playerPosition.y) {
-                        this.playerPosition.x = newLogicalX;
-                        this.playerPosition.y = newLogicalY;
-
-                        this.processItemsAtPosition(this.playerPosition.x, this.playerPosition.y);
-
-                        if (this.isTrapOptimized(this.playerPosition.x, this.playerPosition.y)) {
-                            this.handleDeath();
-                            return;
-                        }
-
-                        if (this.enemies.some(e => Math.round(e.x) === this.playerPosition.x && Math.round(e.y) === this.playerPosition.y)) {
-                            this.handleDeath();
-                            return;
-                        }
-
-                        if (this.playerPosition.x === this.exitPosition.x && this.playerPosition.y === this.exitPosition.y) {
-                            this.handleLevelComplete();
-                            return;
-                        }
-
-                        // Turn logic
-                        if ((this.desiredDirection.dx !== 0 || this.desiredDirection.dy !== 0) &&
-                            (this.desiredDirection.dx !== this.moveDirection.dx || this.desiredDirection.dy !== this.moveDirection.dy)) {
-                            const turnNextX = this.playerPosition.x + this.desiredDirection.dx;
-                            const turnNextY = this.playerPosition.y + this.desiredDirection.dy;
-                            if (!this.isCollisionOptimized(turnNextX, turnNextY)) {
-                                this.playerSprite.setPosition(
-                                    this.playerPosition.x * this.cellSize + this.cellSize / 2,
-                                    this.playerPosition.y * this.cellSize + this.cellSize / 2
-                                );
-                                tween.stop();
-                                this.moving = false;
-                                this.movePlayer(this.desiredDirection.dx, this.desiredDirection.dy);
-                                return;
-                            }
-                        }
-                    }
-                }
-                lastStepProcessed = currentStep;
+                const result = this.onMovementUpdate(tween, dx, dy, startX, startY, finalDestination, lastStepProcessed);
+                if (result !== null) lastStepProcessed = result;
             },
             onComplete: () => {
-                if (this.trailParticles) this.trailParticles.stop();
-
-                this.playerPosition.x = finalDestination.x;
-                this.playerPosition.y = finalDestination.y;
-
-                if (finalDestination.step > 0 && !this.gameOver) {
-                    this.cameras.main.shake(100, 0.005);
-                }
-
-                this.processItemsAtPosition(this.playerPosition.x, this.playerPosition.y);
-
-                if (this.isTrapOptimized(this.playerPosition.x, this.playerPosition.y)) {
-                    this.handleDeath();
-                    return;
-                }
-                if (this.playerPosition.x === this.exitPosition.x && this.playerPosition.y === this.exitPosition.y) {
-                    this.handleLevelComplete();
-                    return;
-                }
-
-                this.moving = false;
-                this.playerMoveTween = null;
-                this.moveDirection = { dx: 0, dy: 0 };
-                this.playerSprite.setTexture('player_stand');
-                this.adjustPlayerScaleAndRotation();
+                this.onMovementComplete(finalDestination);
             },
             callbackScope: this
         });
+    }
+
+    // Helper: Process each step during movement
+    onMovementUpdate(tween, dx, dy, startX, startY, finalDestination, lastStepProcessed) {
+        const progress = tween.progress;
+        const currentStep = Math.floor(progress * finalDestination.step);
+        const stepStart = Math.max(0, lastStepProcessed + 1);
+
+        for (let step = stepStart; step <= currentStep; step++) {
+            const newLogicalX = startX + (dx * step);
+            const newLogicalY = startY + (dy * step);
+
+            if (newLogicalX !== this.playerPosition.x || newLogicalY !== this.playerPosition.y) {
+                this.playerPosition.x = newLogicalX;
+                this.playerPosition.y = newLogicalY;
+
+                this.processItemsAtPosition(this.playerPosition.x, this.playerPosition.y);
+
+                // Check death conditions
+                if (this.isTrapOptimized(this.playerPosition.x, this.playerPosition.y)) {
+                    this.handleDeath();
+                    return null;
+                }
+                if (this.enemies.some(e => Math.round(e.x) === this.playerPosition.x && Math.round(e.y) === this.playerPosition.y)) {
+                    this.handleDeath();
+                    return null;
+                }
+
+                // Check level complete
+                if (this.playerPosition.x === this.exitPosition.x && this.playerPosition.y === this.exitPosition.y) {
+                    this.handleLevelComplete();
+                    return null;
+                }
+
+                // Check for turn opportunity
+                if (this.checkTurnOpportunity(tween)) {
+                    return null;
+                }
+            }
+        }
+        return currentStep;
+    }
+
+    // Helper: Check if player can turn at current position
+    checkTurnOpportunity(tween) {
+        if ((this.desiredDirection.dx !== 0 || this.desiredDirection.dy !== 0) &&
+            (this.desiredDirection.dx !== this.moveDirection.dx || this.desiredDirection.dy !== this.moveDirection.dy)) {
+            const turnNextX = this.playerPosition.x + this.desiredDirection.dx;
+            const turnNextY = this.playerPosition.y + this.desiredDirection.dy;
+
+            if (!this.isCollisionOptimized(turnNextX, turnNextY)) {
+                this.playerSprite.setPosition(
+                    this.playerPosition.x * this.cellSize + this.cellSize / 2,
+                    this.playerPosition.y * this.cellSize + this.cellSize / 2
+                );
+                tween.stop();
+                this.moving = false;
+                this.movePlayer(this.desiredDirection.dx, this.desiredDirection.dy);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Helper: Finalize movement
+    onMovementComplete(finalDestination) {
+        if (this.trailParticles) this.trailParticles.stop();
+
+        this.playerPosition.x = finalDestination.x;
+        this.playerPosition.y = finalDestination.y;
+
+        if (finalDestination.step > 0 && !this.gameOver) {
+            this.cameras.main.shake(100, 0.005);
+        }
+
+        this.processItemsAtPosition(this.playerPosition.x, this.playerPosition.y);
+
+        if (this.isTrapOptimized(this.playerPosition.x, this.playerPosition.y)) {
+            this.handleDeath();
+            return;
+        }
+        if (this.playerPosition.x === this.exitPosition.x && this.playerPosition.y === this.exitPosition.y) {
+            this.handleLevelComplete();
+            return;
+        }
+
+        this.moving = false;
+        this.playerMoveTween = null;
+        this.moveDirection = { dx: 0, dy: 0 };
+        this.playerSprite.setTexture('player_stand');
+        this.adjustPlayerScaleAndRotation();
     }
 
     clearSpriteCache() {
@@ -930,9 +1044,68 @@ export class GameScene extends Phaser.Scene {
         this.resetGame(false);
     }
 
+    returnToMenu() {
+        // Clean up
+        if (this.backgroundMusic) {
+            this.backgroundMusic.stop();
+        }
+        // Hide any new record text
+        if (this.newRecordText) {
+            this.newRecordText.setVisible(false);
+        }
+        if (this.menuText) {
+            this.menuText.setVisible(false);
+        }
+        // Transition to menu
+        this.cameras.main.fadeOut(300, 0, 0, 0);
+        this.time.delayedCall(300, () => {
+            this.scene.start('MenuScene');
+        });
+    }
+
     showGameOver() {
+        // Check and save high score
+        const isNewRecord = ScoreManager.setHighScore(this.score);
+
         this.gameOverText.setVisible(true);
         this.restartText.setVisible(true);
+
+        // Show new record message if applicable
+        if (isNewRecord && this.score > 0) {
+            if (!this.newRecordText) {
+                this.newRecordText = this.add.text(CONFIG.GAME_WIDTH / 2, CONFIG.GAME_HEIGHT / 2 - 60, '¡NUEVO RÉCORD!', {
+                    fontSize: '20px',
+                    fontFamily: CONFIG.UI.FONT_FAMILY,
+                    color: '#ffff00',
+                    stroke: '#ff6600',
+                    strokeThickness: 3
+                });
+                this.newRecordText.setOrigin(0.5);
+            }
+            this.newRecordText.setVisible(true);
+
+            // Pulsing animation for new record
+            this.tweens.add({
+                targets: this.newRecordText,
+                scaleX: 1.2,
+                scaleY: 1.2,
+                duration: 400,
+                yoyo: true,
+                repeat: -1
+            });
+        }
+
+        // Show menu instruction
+        if (!this.menuText) {
+            this.menuText = this.add.text(CONFIG.GAME_WIDTH / 2, CONFIG.GAME_HEIGHT / 2 + CONFIG.UI.RESTART_OFFSET_Y + 30, 'PRESIONA M PARA MENÚ', {
+                fontSize: '14px',
+                fontFamily: CONFIG.UI.FONT_FAMILY,
+                color: '#888888'
+            });
+            this.menuText.setOrigin(0.5);
+        }
+        this.menuText.setVisible(true);
+
         if (this.playerMoveTween) {
             this.playerMoveTween.stop();
             this.playerMoveTween = null;
@@ -1119,7 +1292,7 @@ export class GameScene extends Phaser.Scene {
             this.currentPlaylistIndex = 0;
             return;
         }
-        this.musicPlaylistOrder = [...Array(this.availableMusicKeys.length).keys()];
+        this.musicPlaylistOrder = this.availableMusicKeys.map((_, i) => this.availableMusicKeys[i]);
         for (let i = this.musicPlaylistOrder.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [this.musicPlaylistOrder[i], this.musicPlaylistOrder[j]] = [this.musicPlaylistOrder[j], this.musicPlaylistOrder[i]];
@@ -1140,8 +1313,8 @@ export class GameScene extends Phaser.Scene {
             this.shuffleMusicPlaylist();
         }
 
-        const musicIndex = this.musicPlaylistOrder[this.currentPlaylistIndex];
-        const musicKey = this.availableMusicKeys[musicIndex];
+        // musicPlaylistOrder now contains the actual music keys (strings), not indices
+        const musicKey = this.musicPlaylistOrder[this.currentPlaylistIndex];
         this.currentPlaylistIndex++;
 
         this.playSpecificMusic(musicKey);
@@ -1170,6 +1343,44 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
+    setupTouchControls() {
+        let swipeStartX = 0;
+        let swipeStartY = 0;
+        const minSwipeDistance = 30; // Minimum px to trigger swipe
+
+        this.input.on('pointerdown', (pointer) => {
+            swipeStartX = pointer.x;
+            swipeStartY = pointer.y;
+        });
+
+        this.input.on('pointerup', (pointer) => {
+            if (this.gameOver) return;
+
+            const dx = pointer.x - swipeStartX;
+            const dy = pointer.y - swipeStartY;
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+
+            // Check if swipe is long enough
+            if (Math.max(absDx, absDy) < minSwipeDistance) return;
+
+            // Determine dominant direction
+            if (absDx > absDy) {
+                // Horizontal swipe
+                this.desiredDirection = { dx: dx > 0 ? 1 : -1, dy: 0 };
+            } else {
+                // Vertical swipe
+                this.desiredDirection = { dx: 0, dy: dy > 0 ? 1 : -1 };
+            }
+
+            // Trigger movement
+            if (!this.moving && !this.gameOver) {
+                this.movePlayer(this.desiredDirection.dx, this.desiredDirection.dy);
+                this.requireFreshPressAfterReset = false;
+            }
+        });
+    }
+
     setupUIEventListeners() {
         const toggleMusicButton = document.getElementById('toggle-music');
         const volumeSlider = document.getElementById('volume-slider');
@@ -1191,8 +1402,9 @@ export class GameScene extends Phaser.Scene {
         };
 
         addListener(toggleMusicButton, 'click', () => {
-            if (this.sound && this.sound.context && this.sound.context.state === 'suspended') {
-                this.sound.context.resume().catch(() => { });
+            const soundManager = this.sound as Phaser.Sound.WebAudioSoundManager;
+            if (soundManager && soundManager.context && soundManager.context.state === 'suspended') {
+                soundManager.context.resume().catch(() => { });
             }
             if (this.backgroundMusic && this.backgroundMusic.isPlaying) {
                 this.backgroundMusic.pause();
@@ -1208,7 +1420,9 @@ export class GameScene extends Phaser.Scene {
 
         addListener(volumeSlider, 'input', (e) => {
             if (this.backgroundMusic) {
-                this.backgroundMusic.setVolume(parseFloat(e.target.value));
+                if (this.backgroundMusic && 'setVolume' in this.backgroundMusic) {
+                    (this.backgroundMusic as any).setVolume(parseFloat(e.target.value));
+                }
             }
         });
 
