@@ -8,6 +8,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     preload() {
+        this.load.setBaseURL('.');
         // Load player image for logo
         this.load.image('player_stand', 'lucy_stand.png');
     }

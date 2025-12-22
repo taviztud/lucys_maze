@@ -125,6 +125,9 @@ export class GameScene extends Phaser.Scene {
                 }
             });
 
+            // Ensure assets are loaded relative to the index.html
+            this.load.setBaseURL('.');
+
             this.load.on('filecomplete', (key) => {
                 if (key.startsWith('backgroundMusic')) {
                     if (!this.availableMusicKeys.includes(key)) {

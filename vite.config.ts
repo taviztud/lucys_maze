@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-    base: '/lucys_maze/',
+    base: './',
     build: {
         outDir: 'dist',
         assetsDir: 'assets',
