@@ -1,5 +1,11 @@
 # Lucy's Maze
 
+<p align="center">
+  <img src="public/readme_bg.png" width="100%" alt="Lucy's Maze Banner">
+</p>
+
+
+
 ![Version](https://img.shields.io/badge/version-0.1.2--alpha-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Phaser](https://img.shields.io/badge/engine-Phaser%203-orange)
