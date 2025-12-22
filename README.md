@@ -144,4 +144,4 @@ Este proyecto está licenciado bajo la Licencia MIT.
 
 ---
 
-Made for Lucy 🐶
+Made for Lucy
