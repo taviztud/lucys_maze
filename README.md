@@ -1,7 +1,7 @@
 # Lucy's Maze
 
 <p align="center">
-  <img src="public/readme_bg.png" width="100%" alt="Lucy's Maze Banner">
+  <img src="public/readme_bg.png" alt="Lucy's Maze Banner">
 </p>
 
 
