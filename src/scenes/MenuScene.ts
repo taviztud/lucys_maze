@@ -19,34 +19,35 @@ export class MenuScene extends Phaser.Scene {
         // Background
         this.cameras.main.setBackgroundColor(CONFIG.UI.MAIN_BACKGROUND_COLOR);
 
-        // Title
+        // Title - neon theme colors matching the game
         const title = this.add.text(centerX, centerY - 180, "LUCY'S MAZE", {
             fontSize: '32px',
             fontFamily: CONFIG.UI.FONT_FAMILY,
-            color: '#00ffff',
-            stroke: '#ffffff',
-            strokeThickness: 2
+            color: '#F72585',
+            stroke: '#ff6600',
+            strokeThickness: 3
         });
         title.setOrigin(0.5);
 
-        // Subtitle with glow effect
+        // Subtitle with neon cyan
         const subtitle = this.add.text(centerX, centerY - 130, '¡Ayuda a Lucy a encontrar la salida!', {
             fontSize: '14px',
             fontFamily: CONFIG.UI.FONT_FAMILY,
-            color: '#ffff00'
+            color: '#4CC9F0'
         });
         subtitle.setOrigin(0.5);
 
         // Player sprite as logo
-        const playerLogo = this.add.sprite(centerX, centerY - 40, 'player_stand');
+        const playerLogo = this.add.sprite(centerX, centerY + 60, 'player_stand');
         playerLogo.setScale(3);
+        playerLogo.setOrigin(0.5, 1);  // Origin at feet so animation scales from bottom
 
-        // Pulsing animation for logo
+        // Subtle breathing/idle animation - feet stay grounded
         this.tweens.add({
             targets: playerLogo,
-            scaleX: 3.3,
-            scaleY: 3.3,
-            duration: 800,
+            scaleY: 3.08,         // Slight vertical stretch (breathing in)
+            scaleX: 2.95,         // Slight horizontal compress
+            duration: 1200,
             yoyo: true,
             repeat: -1,
             ease: 'Sine.InOut'

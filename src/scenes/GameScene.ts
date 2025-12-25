@@ -65,6 +65,7 @@ export class GameScene extends Phaser.Scene {
     private saveSprite: Phaser.GameObjects.Sprite;
     private playerDieSprite: Phaser.GameObjects.Sprite;
     private savePulseTween: Phaser.Tweens.Tween;
+    private exitPulseTween: Phaser.Tweens.Tween;
     private gameOverText: Phaser.GameObjects.Text;
     private restartText: Phaser.GameObjects.Text;
 
@@ -207,6 +208,7 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 4
         });
         this.gameOverText.setOrigin(0.5);
+        this.gameOverText.setDepth(100);
         this.gameOverText.setVisible(false);
 
         // Restart Text
@@ -217,6 +219,7 @@ export class GameScene extends Phaser.Scene {
             align: 'center'
         });
         this.restartText.setOrigin(0.5);
+        this.restartText.setDepth(100);
         this.restartText.setVisible(false);
 
         // Initialize maze
@@ -233,13 +236,8 @@ export class GameScene extends Phaser.Scene {
         this.restartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
         this.menuKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
 
-        // Exit blink
-        this.time.addEvent({
-            delay: CONFIG.UI.EXIT_BLINK_INTERVAL,
-            callback: this.toggleExitBlink,
-            callbackScope: this,
-            loop: true
-        });
+        // Exit animation - smooth pulsing instead of simple blink
+        this.startExitAnimation();
 
         // UI Event Listeners
         this.setupUIEventListeners();
@@ -290,11 +288,11 @@ export class GameScene extends Phaser.Scene {
 
         this.trailParticles = this.add.particles(0, 0, 'player_run', {
             speed: 0,
-            scale: { start: calculateSpriteScale('player_run', this.cellSize, this) * 0.8, end: 0 },
-            alpha: { start: 0.4, end: 0 },
-            lifespan: 500, // Slower fade
+            scale: { start: calculateSpriteScale('player_run', this.cellSize, this) * 0.9, end: 0.7 },
+            alpha: { start: 0.15, end: 0 },
+            lifespan: 1000,
             blendMode: 'ADD',
-            frequency: 40, // More frequent for smoother trail
+            frequency: 140,
             emitting: false
         });
     }
@@ -328,7 +326,7 @@ export class GameScene extends Phaser.Scene {
         const neonColor = CONFIG.BACKGROUND_COLORS[(this.level - 1) % CONFIG.BACKGROUND_COLORS.length];
 
         // Create grid group
-        if (this.gridGroup) {
+        if (this.gridGroup && this.gridGroup.children) {
             this.gridGroup.clear(true, true);
         } else {
             this.gridGroup = this.add.group();
@@ -550,6 +548,7 @@ export class GameScene extends Phaser.Scene {
         }
         const exitScale = calculateSpriteScale('exit', this.cellSize, this);
         this.exitSprite.setScale(exitScale);
+        this.startExitAnimation();
 
         // Draw Coins
         this.coinSprites = [];
@@ -600,6 +599,10 @@ export class GameScene extends Phaser.Scene {
                 obstacleSprite.setScale(obstacleScale);
                 this.spriteCache.obstacles[index] = obstacleSprite;
             }
+            // Tag sprite with obstacle data for tree animation
+            (obstacleSprite as any).obstacleType = obstacle.type;
+            (obstacleSprite as any).gridX = obstacle.x;
+            (obstacleSprite as any).gridY = obstacle.y;
             this.obstacleSprites.push(obstacleSprite);
         });
 
@@ -624,6 +627,25 @@ export class GameScene extends Phaser.Scene {
                 trapSprite.setScale(trapScale);
                 this.spriteCache.traps[index] = trapSprite;
             }
+
+            // Spinning animation with acceleration (slow start, speed up)
+            // Staggered delays so traps don't all spin at the same time
+            const staggerDelay = Phaser.Math.Between(0, 2000);
+            this.time.delayedCall(staggerDelay, () => {
+                if (trapSprite && trapSprite.active) {
+                    this.tweens.add({
+                        targets: trapSprite,
+                        angle: 360,
+                        duration: 1500,
+                        ease: 'Cubic.InOut',  // Starts slow, accelerates, then slows
+                        repeat: -1,
+                        onRepeat: (tween) => {
+                            trapSprite.setAngle(0);  // Reset angle for smooth loop
+                        }
+                    });
+                }
+            });
+
             this.trapSprites.push(trapSprite);
         });
 
@@ -720,7 +742,7 @@ export class GameScene extends Phaser.Scene {
 
         if (this.trailParticles) {
             this.trailParticles.start();
-            this.trailParticles.follow = this.playerSprite;
+            this.trailParticles.startFollow(this.playerSprite);
         }
     }
 
@@ -989,6 +1011,41 @@ export class GameScene extends Phaser.Scene {
                 }
             }
         }
+
+        // Animate nearby trees when Lucy passes
+        this.animateNearbyTrees(x, y);
+    }
+
+    animateNearbyTrees(playerX: number, playerY: number) {
+        this.obstacles.forEach((obstacle, index) => {
+            if (obstacle.type !== 'tree') return;
+
+            // Check if tree is adjacent (within 1 cell)
+            const distX = Math.abs(obstacle.x - playerX);
+            const distY = Math.abs(obstacle.y - playerY);
+            if (distX <= 1 && distY <= 1 && (distX + distY) > 0) {
+                const treeSprite = this.spriteCache.obstacles[index];
+                if (treeSprite && treeSprite.active) {
+                    // Subtle sway animation - only if not already animating
+                    if (!(treeSprite as any).isSwaying) {
+                        (treeSprite as any).isSwaying = true;
+                        const swayDirection = playerX < obstacle.x ? -1 : 1;
+                        this.tweens.add({
+                            targets: treeSprite,
+                            angle: { from: 0, to: swayDirection * 8 },
+                            duration: 150,
+                            ease: 'Sine.InOut',
+                            yoyo: true,
+                            repeat: 1,
+                            onComplete: () => {
+                                treeSprite.setAngle(0);
+                                (treeSprite as any).isSwaying = false;
+                            }
+                        });
+                    }
+                }
+            }
+        });
     }
 
     isCollisionOptimized(x, y) {
@@ -1081,6 +1138,7 @@ export class GameScene extends Phaser.Scene {
                     strokeThickness: 3
                 });
                 this.newRecordText.setOrigin(0.5);
+                this.newRecordText.setDepth(100);
             }
             this.newRecordText.setVisible(true);
 
@@ -1103,6 +1161,7 @@ export class GameScene extends Phaser.Scene {
                 color: '#888888'
             });
             this.menuText.setOrigin(0.5);
+            this.menuText.setDepth(100);
         }
         this.menuText.setVisible(true);
 
@@ -1138,6 +1197,12 @@ export class GameScene extends Phaser.Scene {
 
         this.gameOverText.setVisible(false);
         this.restartText.setVisible(false);
+        if (this.newRecordText) {
+            this.newRecordText.setVisible(false);
+        }
+        if (this.menuText) {
+            this.menuText.setVisible(false);
+        }
 
         this.createGrid();
 
@@ -1185,15 +1250,27 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
-    toggleExitBlink() {
-        this.exitBlinkState = !this.exitBlinkState;
-        if (this.exitSprite) {
-            if (this.exitBlinkState) {
-                this.exitSprite.setAlpha(CONFIG.UI.EXIT_BLINK_ALPHA_HIGH);
-            } else {
-                this.exitSprite.setAlpha(CONFIG.UI.EXIT_BLINK_ALPHA_LOW);
-            }
+    startExitAnimation() {
+        if (!this.exitSprite) return;
+
+        // Stop existing tween if any
+        if (this.exitPulseTween) {
+            this.exitPulseTween.stop();
         }
+
+        const baseScale = calculateSpriteScale('exit', this.cellSize, this);
+
+        // Smooth pulsing animation with scale, alpha and subtle glow
+        this.exitPulseTween = this.tweens.add({
+            targets: this.exitSprite,
+            scaleX: { from: baseScale * 0.95, to: baseScale * 1.1 },
+            scaleY: { from: baseScale * 0.95, to: baseScale * 1.1 },
+            alpha: { from: 0.7, to: 1.0 },
+            duration: 800,
+            ease: 'Sine.InOut',
+            yoyo: true,
+            repeat: -1
+        });
     }
 
     initEnemies() {
