@@ -245,6 +245,16 @@ export class GameStateManager {
     }
 
     /**
+     * Aplica valores de dev mode
+     */
+    applyDevMode(level: number, shields: number, continues: number, score: number): void {
+        this._level = level;
+        this._shieldCount = shields;
+        this._continueCount = continues;
+        this._score = score;
+    }
+
+    /**
      * Retorna al menú principal
      */
     returnToMenu(): void {

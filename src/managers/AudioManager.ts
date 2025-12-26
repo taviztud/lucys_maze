@@ -40,11 +40,19 @@ export class AudioManager {
             }
         });
 
-        // Queue music files for loading
+        // Queue music files for loading OR add existing ones
         for (let i = 1; i <= maxTracks; i++) {
             const paddedNumber = i.toString().padStart(3, '0');
             const filename = `bg_${paddedNumber}.mp3`;
             const key = `backgroundMusic${i - 1}`;
+
+            // Check if already in cache (crucial for restarts/scene switches)
+            if (this.scene.cache.audio.exists(key)) {
+                if (!this.availableMusicKeys.includes(key)) {
+                    this.availableMusicKeys.push(key);
+                }
+                continue; // Skip loading if already exists
+            }
 
             try {
                 this.scene.load.audio(key, `sound/bg/${filename}`);
@@ -145,8 +153,6 @@ export class AudioManager {
             this.backgroundMusic.once('complete', () => {
                 this.playNext();
             });
-
-            this.updateToggleButton(true);
         } catch (error) {
             console.error('Error in playSpecific:', error);
         }
@@ -163,10 +169,8 @@ export class AudioManager {
 
         if (this.backgroundMusic?.isPlaying) {
             this.backgroundMusic.pause();
-            this.updateToggleButton(false);
         } else if (this.backgroundMusic) {
             this.backgroundMusic.resume();
-            this.updateToggleButton(true);
         } else {
             this.playNext();
         }
@@ -199,15 +203,6 @@ export class AudioManager {
         return this.backgroundMusic?.isPlaying ?? false;
     }
 
-    /**
-     * Actualiza el texto del botón de toggle
-     */
-    private updateToggleButton(isPlaying: boolean): void {
-        const toggleButton = document.getElementById('toggle-music');
-        if (toggleButton) {
-            toggleButton.textContent = isPlaying ? 'Música Off' : 'Música On';
-        }
-    }
 
     /**
      * Limpieza de recursos

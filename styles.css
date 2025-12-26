@@ -70,7 +70,7 @@ body {
     width: calc(100vw - 16px);
     height: calc(100vw - 16px);
     max-width: 600px;
-    max-height: min(600px, calc(100vh - 130px));
+    max-height: min(600px, calc(100vh - 140px));
     border: 4px solid #2c3e50;
     border-radius: 20px;
     box-shadow:
@@ -97,87 +97,164 @@ body {
     z-index: 10;
 }
 
-/* BOTTOM: Audio controls */
-#audio-controls {
+/* BOTTOM: Controls bar */
+#controls-bar {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    background: linear-gradient(180deg, #111 0%, #0a0a0a 100%);
+    gap: 20px;
+    background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
     padding: 8px 16px;
     border: 1px solid #333;
-    border-radius: 4px;
+    border-radius: 6px;
     flex-shrink: 0;
+    width: 100%;
+    max-width: 500px;
 }
 
-/* Buttons */
+/* Music controls group */
+#music-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-right: 16px;
+    border-right: 1px solid #333;
+}
+
+/* Game controls group */
+#game-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Base button styles */
 button {
     font-family: 'Press Start 2P', cursive;
-    background: #000;
-    color: #fff;
-    border: 2px solid #fff;
+    background: #111;
+    color: #888;
+    border: 2px solid #444;
     padding: 6px 10px;
     font-size: 10px;
     cursor: pointer;
-    box-shadow: 2px 2px 0 #444;
-    transition: all 0.1s;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    min-width: 32px;
 }
 
 button:active {
-    transform: translate(1px, 1px);
-    box-shadow: 1px 1px 0 #444;
+    transform: scale(0.95);
 }
 
 button:hover {
     background: #222;
-    color: #0ff;
-    border-color: #0ff;
+    color: #fff;
+    border-color: #666;
+}
+
+/* Music control buttons */
+#toggle-music {
+    color: #4ade80;
+    border-color: #4ade80;
+}
+
+#toggle-music:hover {
+    background: #052e16;
+    color: #86efac;
+    border-color: #86efac;
+}
+
+#toggle-music.playing {
+    color: #fbbf24;
+    border-color: #fbbf24;
+}
+
+#toggle-music.playing:hover {
+    background: #451a03;
+    color: #fcd34d;
+    border-color: #fcd34d;
+}
+
+#stop-music {
+    color: #f87171;
+    border-color: #f87171;
+}
+
+#stop-music:hover {
+    background: #450a0a;
+    color: #fca5a5;
+    border-color: #fca5a5;
+}
+
+#next-music {
+    color: #60a5fa;
+    border-color: #60a5fa;
+}
+
+#next-music:hover {
+    background: #172554;
+    color: #93c5fd;
+    border-color: #93c5fd;
+}
+
+/* Game control buttons */
+#menu-button {
+    color: #a78bfa;
+    border-color: #a78bfa;
+}
+
+#menu-button:hover {
+    background: #2e1065;
+    color: #c4b5fd;
+    border-color: #c4b5fd;
+}
+
+#continue-button {
+    color: #2dd4bf;
+    border-color: #2dd4bf;
+}
+
+#continue-button:hover {
+    background: #042f2e;
+    color: #5eead4;
+    border-color: #5eead4;
 }
 
 #restart-button {
-    background: #600;
-    border-color: #f44;
-    color: #f44;
-    padding: 6px 8px;
+    color: #fb923c;
+    border-color: #fb923c;
 }
 
 #restart-button:hover {
-    background: #900;
-    color: #ff0;
-}
-
-#toggle-music {
-    color: #0f0;
-    border-color: #0f0;
-}
-
-#audio-controls button {
-    padding: 6px 10px;
-    font-size: 12px;
+    background: #431407;
+    color: #fdba74;
+    border-color: #fdba74;
 }
 
 /* Volume slider */
 input[type=range] {
     -webkit-appearance: none;
     appearance: none;
-    width: 60px;
+    width: 50px;
     background: transparent;
+    cursor: pointer;
 }
 
 input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    background: #0ff;
+    width: 12px;
+    height: 12px;
+    background: #60a5fa;
     cursor: pointer;
-    margin-top: -5px;
+    margin-top: -4px;
     border-radius: 2px;
 }
 
 input[type=range]::-webkit-slider-runnable-track {
     height: 4px;
-    background: #444;
-    border: 1px solid #666;
+    background: #333;
+    border: 1px solid #444;
+    border-radius: 2px;
 }
 
 /* CRT scanline effect */
@@ -203,16 +280,27 @@ body::after {
         gap: 24px;
     }
 
-    #audio-controls {
-        gap: 12px;
-        padding: 10px 20px;
+    #controls-bar {
+        gap: 30px;
+        padding: 10px 24px;
     }
 
-    #audio-controls button {
-        padding: 8px 14px;
+    #music-controls {
+        gap: 8px;
+        padding-right: 24px;
+    }
+
+    #game-controls {
+        gap: 8px;
+    }
+
+    button {
+        padding: 8px 12px;
+        font-size: 11px;
+        min-width: 38px;
     }
 
     input[type=range] {
-        width: 100px;
+        width: 70px;
     }
 }

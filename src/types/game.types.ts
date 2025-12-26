@@ -130,6 +130,7 @@ export interface GameConfig {
     POWERUPS: {
         SPAWN_COIN_RATIO: number;
         SHIELD_PROBABILITY: number;
+        SHIELD_INVINCIBILITY_MS: number;
     };
     PERFORMANCE: {
         INPUT_THROTTLE_MS: number;
@@ -137,6 +138,10 @@ export interface GameConfig {
         PLAYER_MIN_STEP_DURATION_MS: number;
         PLAYER_BASE_DURATION_MS: number;
         PLAYER_STEP_DEC_PER_LEVEL: number;
+        PLAYER_STEP_DEC_SLOW: number;
+        PLAYER_STEP_DEC_TINY: number;
+        PLAYER_PHASE1_MAX_LEVEL: number;
+        PLAYER_PHASE2_MAX_LEVEL: number;
     };
     DEBUG: boolean;
 }

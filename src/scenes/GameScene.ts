@@ -16,6 +16,7 @@ import { MazeGenerator, type MazeData } from '../systems/MazeGenerator';
 import { GridRenderer } from '../systems/GridRenderer';
 
 import type { Position, Direction } from '../types/game.types';
+import type { DevModeData } from './MenuScene';
 
 /**
  * Escena principal del juego - Actúa como orquestador de todos los managers
@@ -50,6 +51,7 @@ export class GameScene extends Phaser.Scene {
     // Optimization
     private lastEnemyUpdateTime: number = 0;
     private requireFreshPressAfterReset: boolean = false;
+    private invincibilityEndTime: number = 0; // Temporal invincibility after shield use
 
     constructor() {
         super('GameScene');
@@ -82,9 +84,14 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
-    create(): void {
+    create(data?: DevModeData): void {
         // Initialize all managers and systems
         this.initializeManagers();
+
+        // Apply dev mode data if provided
+        if (data && data.enabled) {
+            this.gameState.applyDevMode(data.level, data.shields, data.continues, data.score);
+        }
 
         // Setup event listeners
         this.setupEvents();
@@ -97,34 +104,46 @@ export class GameScene extends Phaser.Scene {
 
         // Setup UI event listeners
         this.uiManager.setupEventListeners({
-            onMusicToggle: () => this.audioManager.togglePlayPause(),
+            onMusicToggle: () => {
+                this.audioManager.togglePlayPause();
+                this.uiManager.updateMusicButtonState(this.audioManager.isPlaying());
+            },
+            onMusicStop: () => {
+                this.audioManager.stop();
+                this.uiManager.updateMusicButtonState(false);
+            },
             onVolumeChange: (vol) => this.audioManager.setVolume(vol),
-            onNextMusic: () => this.audioManager.playNext(),
-            onPrevMusic: () => this.audioManager.playPrevious(),
+            onNextMusic: () => {
+                this.audioManager.playNext();
+                this.uiManager.updateMusicButtonState(this.audioManager.isPlaying());
+            },
+            onMenu: () => this.returnToMenu(),
+            onContinue: () => this.handleContinueButton(),
             onRestart: () => this.handleRestartButton()
         });
 
         // Update initial UI
         this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
+        this.updatePowerUpsUI();
     }
 
     update(time: number, _delta: number): void {
+        // Global inputs (Available anytime)
+        if (this.inputManager.isMenuJustPressed()) {
+            this.returnToMenu();
+            return;
+        }
+
+        if (this.inputManager.isRestartJustPressed()) {
+            this.handleRestartButton();
+            return;
+        }
+
         // Handle game over input
         if (this.gameState.isGameOver) {
-            // R = Full restart (reset everything)
-            if (this.inputManager.isRestartJustPressed()) {
-                this.gameState.reset(true);
-                this.updatePowerUpsUI();
-                this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
-                this.resetGame(true);
-            }
-            // C = Continue (use power-up, keep level and score)
-            if (this.inputManager.isContinueJustPressed() && this.gameState.useContinue()) {
-                this.updatePowerUpsUI();
-                this.resetGame(false);
-            }
-            if (this.inputManager.isMenuJustPressed()) {
-                this.returnToMenu();
+            // C = Continue (only available in game over)
+            if (this.inputManager.isContinueJustPressed()) {
+                this.handleContinueButton();
             }
             return;
         }
@@ -136,6 +155,7 @@ export class GameScene extends Phaser.Scene {
             // Update spiders and check collision
             const playerPos = this.playerController.getPosition();
             const playerHit = this.spiderManager.update(time, playerPos);
+            // Only handle hit if not already game over (invincibility is checked in handleDeath)
             if (playerHit && !this.gameState.isGameOver) {
                 this.handleDeath();
             }
@@ -385,13 +405,23 @@ export class GameScene extends Phaser.Scene {
     /**
      * Maneja la muerte del jugador
      * Primero intenta usar shield (flash sin detener), luego game over
+     * Verifica invincibilidad para evitar consumo múltiple de shields
      */
     private handleDeath(): void {
+        const currentTime = this.time.now;
+
+        // Skip if currently invincible (shield was just used)
+        if (currentTime < this.invincibilityEndTime) {
+            return;
+        }
+
         // Try to use shield first
         if (this.gameState.useShield()) {
             // Shield absorbed the hit - flash player and continue movement
             this.playerController.flashInvincibility();
             this.updatePowerUpsUI();
+            // Set invincibility window to prevent multiple shield consumption
+            this.invincibilityEndTime = currentTime + CONFIG.POWERUPS.SHIELD_INVINCIBILITY_MS;
             return;
         }
 
@@ -470,18 +500,24 @@ export class GameScene extends Phaser.Scene {
     }
 
     /**
-     * Maneja el botón de restart de UI
+     * Maneja el botón de Continue de UI
      */
-    private handleRestartButton(): void {
-        if (this.gameState.useContinue()) {
+    private handleContinueButton(): void {
+        if (this.gameState.isGameOver && this.gameState.useContinue()) {
+            this.gameState.isGameOver = false;
             this.updatePowerUpsUI();
             this.resetGame(false);
-        } else {
-            this.gameState.reset(true);
-            this.updatePowerUpsUI();
-            this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
-            this.resetGame(true);
         }
+    }
+
+    /**
+     * Maneja el botón de restart de UI (siempre hace full reset)
+     */
+    private handleRestartButton(): void {
+        this.gameState.reset(true);
+        this.updatePowerUpsUI();
+        this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
+        this.resetGame(true);
     }
 
     /**

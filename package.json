@@ -1,6 +1,6 @@
 {
   "name": "lucys-maze",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Lucy's Maze - Un juego estilo Tomb of the Mask con Phaser 3",
   "type": "module",
   "scripts": {

@@ -5,9 +5,11 @@ import type { EventListenerEntry } from '../types/game.types';
  */
 export interface UICallbacks {
     onMusicToggle: () => void;
+    onMusicStop: () => void;
     onVolumeChange: (volume: number) => void;
     onNextMusic: () => void;
-    onPrevMusic: () => void;
+    onMenu: () => void;
+    onContinue: () => void;
     onRestart: () => void;
 }
 
@@ -16,6 +18,7 @@ export interface UICallbacks {
  */
 export class UIManager {
     private eventListenerCleanup: EventListenerEntry[] = [];
+    private toggleMusicButton: HTMLElement | null = null;
 
     constructor() { }
 
@@ -76,16 +79,33 @@ export class UIManager {
     }
 
     /**
+     * Actualiza el estado visual del botón de música
+     */
+    updateMusicButtonState(isPlaying: boolean): void {
+        if (this.toggleMusicButton) {
+            if (isPlaying) {
+                this.toggleMusicButton.textContent = '❚❚';
+                this.toggleMusicButton.classList.add('playing');
+            } else {
+                this.toggleMusicButton.textContent = '▶';
+                this.toggleMusicButton.classList.remove('playing');
+            }
+        }
+    }
+
+    /**
      * Configura los event listeners para los controles de UI
      */
     setupEventListeners(callbacks: UICallbacks): void {
         // Cleanup old listeners
         this.cleanup();
 
-        const toggleMusicButton = document.getElementById('toggle-music');
+        this.toggleMusicButton = document.getElementById('toggle-music');
+        const stopMusicButton = document.getElementById('stop-music');
         const volumeSlider = document.getElementById('volume-slider') as HTMLInputElement;
         const nextButton = document.getElementById('next-music');
-        const prevButton = document.getElementById('prev-music');
+        const menuButton = document.getElementById('menu-button');
+        const continueButton = document.getElementById('continue-button');
         const restartButton = document.getElementById('restart-button');
 
         const addListener = (
@@ -99,8 +119,12 @@ export class UIManager {
             }
         };
 
-        addListener(toggleMusicButton, 'click', () => {
+        addListener(this.toggleMusicButton, 'click', () => {
             callbacks.onMusicToggle();
+        });
+
+        addListener(stopMusicButton, 'click', () => {
+            callbacks.onMusicStop();
         });
 
         addListener(volumeSlider, 'input', (e: Event) => {
@@ -112,8 +136,12 @@ export class UIManager {
             callbacks.onNextMusic();
         });
 
-        addListener(prevButton, 'click', () => {
-            callbacks.onPrevMusic();
+        addListener(menuButton, 'click', () => {
+            callbacks.onMenu();
+        });
+
+        addListener(continueButton, 'click', () => {
+            callbacks.onContinue();
         });
 
         addListener(restartButton, 'click', () => {

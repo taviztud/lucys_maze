@@ -19,7 +19,7 @@ export const CONFIG: GameConfig = {
     // Configuración de música y audio
     AUDIO: {
         DEFAULT_VOLUME: 0.5,
-        MAX_BG_TRACKS: 14
+        MAX_BG_TRACKS: 26
     },
 
     // UI y efectos visuales
@@ -62,15 +62,20 @@ export const CONFIG: GameConfig = {
     // Configuración de power-ups
     POWERUPS: {
         SPAWN_COIN_RATIO: 0.8,
-        SHIELD_PROBABILITY: 0.8
+        SHIELD_PROBABILITY: 0.8,
+        SHIELD_INVINCIBILITY_MS: 500 // Invincibility window after shield use
     },
 
     PERFORMANCE: {
         INPUT_THROTTLE_MS: 16,
         ENEMY_UPDATE_THROTTLE_MS: 16,
-        PLAYER_MIN_STEP_DURATION_MS: 200,
-        PLAYER_BASE_DURATION_MS: 400,
-        PLAYER_STEP_DEC_PER_LEVEL: 20
+        PLAYER_MIN_STEP_DURATION_MS: 60,      // Velocidad máxima absoluta
+        PLAYER_BASE_DURATION_MS: 400,         // Velocidad inicial
+        PLAYER_STEP_DEC_PER_LEVEL: 20,        // Fase 1: -20ms por nivel (1-10)
+        PLAYER_STEP_DEC_SLOW: 5,              // Fase 2: -5ms por nivel (11-34)
+        PLAYER_STEP_DEC_TINY: 1,              // Fase 3: -1ms por nivel (35+)
+        PLAYER_PHASE1_MAX_LEVEL: 10,          // Fase 1 termina en nivel 10
+        PLAYER_PHASE2_MAX_LEVEL: 34           // Fase 2 termina en nivel 34
     },
 
     DEBUG: false

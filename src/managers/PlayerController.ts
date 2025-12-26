@@ -123,12 +123,38 @@ export class PlayerController {
 
     /**
      * Calcula la duración de cada paso basado en el nivel
+     * Fase 1 (niveles 1-10): Aceleración rápida (-20ms por nivel)
+     * Fase 2 (niveles 11-34): Aceleración moderada (-5ms por nivel)
+     * Fase 3 (niveles 35+): Aceleración mínima (-1ms por nivel hasta 60ms)
      */
     private calculateStepDuration(level: number): number {
-        return Math.max(
-            CONFIG.PERFORMANCE.PLAYER_MIN_STEP_DURATION_MS,
-            CONFIG.PERFORMANCE.PLAYER_BASE_DURATION_MS - level * CONFIG.PERFORMANCE.PLAYER_STEP_DEC_PER_LEVEL
-        );
+        const baseMs = CONFIG.PERFORMANCE.PLAYER_BASE_DURATION_MS;            // 400ms
+        const fastDecPerLevel = CONFIG.PERFORMANCE.PLAYER_STEP_DEC_PER_LEVEL; // 20ms
+        const slowDecPerLevel = CONFIG.PERFORMANCE.PLAYER_STEP_DEC_SLOW;      // 5ms
+        const tinyDecPerLevel = CONFIG.PERFORMANCE.PLAYER_STEP_DEC_TINY;      // 1ms
+        const phase1Limit = CONFIG.PERFORMANCE.PLAYER_PHASE1_MAX_LEVEL;       // 10
+        const phase2Limit = CONFIG.PERFORMANCE.PLAYER_PHASE2_MAX_LEVEL;       // 34
+        const minMs = CONFIG.PERFORMANCE.PLAYER_MIN_STEP_DURATION_MS;         // 60ms
+
+        let duration: number;
+
+        if (level <= phase1Limit) {
+            // Fase 1: Aceleración rápida (niveles 1-10)
+            duration = baseMs - level * fastDecPerLevel;
+        } else if (level <= phase2Limit) {
+            // Fase 2: Aceleración moderada (niveles 11-34)
+            const phase1Duration = baseMs - phase1Limit * fastDecPerLevel; // 200ms at level 10
+            const extraLevels = level - phase1Limit;
+            duration = phase1Duration - extraLevels * slowDecPerLevel;
+        } else {
+            // Fase 3: Aceleración mínima (niveles 35+)
+            const phase1Duration = baseMs - phase1Limit * fastDecPerLevel; // 200ms
+            const phase2Duration = phase1Duration - (phase2Limit - phase1Limit) * slowDecPerLevel; // 80ms at level 34
+            const extraLevels = level - phase2Limit;
+            duration = phase2Duration - extraLevels * tinyDecPerLevel;
+        }
+
+        return Math.max(minMs, duration);
     }
 
     /**
