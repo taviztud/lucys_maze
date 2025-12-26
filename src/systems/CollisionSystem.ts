@@ -5,26 +5,28 @@ import type { Position, Obstacle } from '../types/game.types';
  * Proporciona queries rápidas O(1) para detección de colisiones
  */
 export class CollisionSystem {
-    private boardSize: number;
+    private width: number;
+    private height: number;
     private collisionMap: boolean[][] | null = null;
 
-    constructor(boardSize: number) {
-        this.boardSize = boardSize;
+    constructor(width: number, height: number) {
+        this.width = width;
+        this.height = height;
     }
 
     /**
      * Construye el mapa de colisiones basado en obstáculos
      */
     build(obstacles: Obstacle[]): void {
-        if (!this.boardSize || this.boardSize < 1) {
-            console.error('CollisionSystem.build: Invalid boardSize:', this.boardSize);
+        if (!this.width || this.width < 1 || !this.height || this.height < 1) {
+            console.error('CollisionSystem.build: Invalid dimensions:', this.width, this.height);
             return;
         }
 
         try {
             this.collisionMap = Array.from(
-                { length: this.boardSize },
-                () => Array(this.boardSize).fill(false)
+                { length: this.height },
+                () => Array(this.width).fill(false)
             );
 
             obstacles.forEach(obstacle => {
@@ -35,8 +37,8 @@ export class CollisionSystem {
         } catch (error) {
             console.error('Error building collision map:', error);
             this.collisionMap = Array.from(
-                { length: this.boardSize },
-                () => Array(this.boardSize).fill(false)
+                { length: this.height },
+                () => Array(this.width).fill(false)
             );
         }
     }
@@ -65,14 +67,14 @@ export class CollisionSystem {
      * Verifica si las coordenadas están fuera del tablero
      */
     isOutOfBounds(x: number, y: number): boolean {
-        return x < 0 || x >= this.boardSize || y < 0 || y >= this.boardSize;
+        return x < 0 || x >= this.width || y < 0 || y >= this.height;
     }
 
     /**
      * Verifica si las coordenadas están dentro del tablero
      */
     isWithinBounds(x: number, y: number): boolean {
-        return x >= 0 && x < this.boardSize && y >= 0 && y < this.boardSize;
+        return x >= 0 && x < this.width && y >= 0 && y < this.height;
     }
 
     /**
@@ -130,15 +132,16 @@ export class CollisionSystem {
     /**
      * Actualiza el tamaño del tablero
      */
-    setBoardSize(size: number): void {
-        this.boardSize = size;
+    setBoardDimensions(width: number, height: number): void {
+        this.width = width;
+        this.height = height;
         this.collisionMap = null;
     }
 
     /**
-     * Obtiene el tamaño del tablero
+     * Obtiene las dimensiones del tablero
      */
-    getBoardSize(): number {
-        return this.boardSize;
+    getBoardDimensions(): { width: number; height: number } {
+        return { width: this.width, height: this.height };
     }
 }

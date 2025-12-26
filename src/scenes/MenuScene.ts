@@ -114,7 +114,7 @@ export class MenuScene extends Phaser.Scene {
         instructions.setOrigin(0.5);
 
         // Dev Mode button (small, in corner)
-        const devButton = this.add.text(CONFIG.GAME_WIDTH - 10, 10, '🔧 DEV', {
+        const devButton = this.add.text(CONFIG.GAME_WIDTH - 10, 10, 'DEV', {
             fontSize: '12px',
             fontFamily: CONFIG.UI.FONT_FAMILY,
             color: '#666666',
@@ -161,7 +161,7 @@ export class MenuScene extends Phaser.Scene {
         this.devPanel.add(bg);
 
         // Title
-        const title = this.add.text(0, -110, '🔧 DEV MODE', {
+        const title = this.add.text(0, -110, 'DEV MODE', {
             fontSize: '16px',
             fontFamily: CONFIG.UI.FONT_FAMILY,
             color: '#4CC9F0'

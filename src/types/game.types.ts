@@ -85,7 +85,8 @@ export interface EventListenerEntry {
 export interface GameConfig {
     GAME_WIDTH: number;
     GAME_HEIGHT: number;
-    BOARD_SIZE: number;
+    BOARD_WIDTH: number;
+    BOARD_HEIGHT: number;
     CELL_SIZE: number;
     MAZE_GENERATION: {
         OBSTACLE_PROBABILITY: number;

@@ -23,7 +23,8 @@ import type { DevModeData } from './MenuScene';
  */
 export class GameScene extends Phaser.Scene {
     // Configuration
-    private boardSize: number;
+    private boardWidth: number;
+    private boardHeight: number;
     private cellSize: number;
 
     // Managers
@@ -55,7 +56,8 @@ export class GameScene extends Phaser.Scene {
 
     constructor() {
         super('GameScene');
-        this.boardSize = CONFIG.BOARD_SIZE;
+        this.boardWidth = CONFIG.BOARD_WIDTH;
+        this.boardHeight = CONFIG.BOARD_HEIGHT;
         this.cellSize = CONFIG.CELL_SIZE;
     }
 
@@ -169,16 +171,16 @@ export class GameScene extends Phaser.Scene {
      */
     private initializeManagers(): void {
         // Core systems
-        this.collision = new CollisionSystem(this.boardSize);
-        this.mazeGenerator = new MazeGenerator(this.boardSize);
-        this.gridRenderer = new GridRenderer(this, this.cellSize, this.boardSize);
+        this.collision = new CollisionSystem(this.boardWidth, this.boardHeight);
+        this.mazeGenerator = new MazeGenerator(this.boardWidth, this.boardHeight);
+        this.gridRenderer = new GridRenderer(this, this.cellSize, this.boardWidth, this.boardHeight);
 
         // Managers
         this.inputManager = new InputManager(this);
         // audioManager already initialized in preload
         this.playerController = new PlayerController(this, this.collision, this.cellSize);
         this.enemyManager = new EnemyManager(this, this.collision, this.cellSize);
-        this.spiderManager = new SpiderManager(this, this.collision, this.cellSize, this.boardSize);
+        this.spiderManager = new SpiderManager(this, this.collision, this.cellSize, this.boardWidth, this.boardHeight);
         this.uiManager = new UIManager();
         this.gameState = new GameStateManager(this);
 

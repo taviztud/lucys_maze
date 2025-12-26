@@ -21,7 +21,8 @@ export interface RenderData {
 export class GridRenderer {
     private scene: Phaser.Scene;
     private cellSize: number;
-    private boardSize: number;
+    private width: number;
+    private height: number;
     private gridGroup: Phaser.GameObjects.Group | null = null;
     private spriteCache: SpriteCache = { coins: [], obstacles: [], traps: [] };
 
@@ -36,10 +37,11 @@ export class GridRenderer {
     private savePulseTween: Phaser.Tweens.Tween | null = null;
     private shieldPulseTween: Phaser.Tweens.Tween | null = null;
 
-    constructor(scene: Phaser.Scene, cellSize: number, boardSize: number) {
+    constructor(scene: Phaser.Scene, cellSize: number, width: number, height: number) {
         this.scene = scene;
         this.cellSize = cellSize;
-        this.boardSize = boardSize;
+        this.width = width;
+        this.height = height;
     }
 
     /**
@@ -59,19 +61,24 @@ export class GridRenderer {
         const graphics = this.scene.add.graphics();
         graphics.lineStyle(1, neonColor, CONFIG.GRID_ALPHA);
 
-        for (let i = 0; i <= this.boardSize; i++) {
-            graphics.moveTo(i * this.cellSize, 0);
-            graphics.lineTo(i * this.cellSize, this.boardSize * this.cellSize);
-            graphics.moveTo(0, i * this.cellSize);
-            graphics.lineTo(this.boardSize * this.cellSize, i * this.cellSize);
+        // Vertical lines
+        for (let x = 0; x <= this.width; x++) {
+            graphics.moveTo(x * this.cellSize, 0);
+            graphics.lineTo(x * this.cellSize, this.height * this.cellSize);
+        }
+
+        // Horizontal lines
+        for (let y = 0; y <= this.height; y++) {
+            graphics.moveTo(0, y * this.cellSize);
+            graphics.lineTo(this.width * this.cellSize, y * this.cellSize);
         }
 
         graphics.strokePath();
         this.gridGroup.add(graphics);
 
         // Add dots at intersections
-        for (let y = 0; y < this.boardSize; y++) {
-            for (let x = 0; x < this.boardSize; x++) {
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
                 const dot = this.scene.add.rectangle(
                     x * this.cellSize + this.cellSize / 2,
                     y * this.cellSize + this.cellSize / 2,

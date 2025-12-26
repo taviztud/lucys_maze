@@ -34,20 +34,22 @@ export function calculateSpriteScale(
 /**
  * Genera una posición aleatoria libre en el tablero
  * @param excludePositions - Array de posiciones a excluir
- * @param boardSize - Tamaño del tablero
+ * @param width - Ancho del tablero
+ * @param height - Alto del tablero
  * @returns Posición libre o null si no se encuentra
  */
 export function generateFreePosition(
     excludePositions: Position[] = [],
-    boardSize: number
+    width: number,
+    height: number
 ): Position | null {
     if (!Array.isArray(excludePositions)) {
         console.warn('generateFreePosition: excludePositions must be an array');
         excludePositions = [];
     }
 
-    if (!boardSize || boardSize < 1) {
-        console.error('generateFreePosition: Invalid boardSize:', boardSize);
+    if (!width || width < 1 || !height || height < 1) {
+        console.error('generateFreePosition: Invalid dimensions:', width, height);
         return null;
     }
 
@@ -56,8 +58,8 @@ export function generateFreePosition(
 
     while (attempts < maxAttempts) {
         const position: Position = {
-            x: Math.floor(Math.random() * boardSize),
-            y: Math.floor(Math.random() * boardSize)
+            x: Math.floor(Math.random() * width),
+            y: Math.floor(Math.random() * height)
         };
 
         const isOccupied = excludePositions.some(

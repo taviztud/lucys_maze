@@ -17,10 +17,12 @@ export interface MazeData {
  * Generador procedural de laberintos con validación de solvability
  */
 export class MazeGenerator {
-    private boardSize: number;
+    private width: number;
+    private height: number;
 
-    constructor(boardSize: number) {
-        this.boardSize = boardSize;
+    constructor(width: number, height: number) {
+        this.width = width;
+        this.height = height;
     }
 
     /**
@@ -52,9 +54,9 @@ export class MazeGenerator {
     generateRandomExit(): Position {
         const side = Math.floor(Math.random() * 2);
         if (side === 0) {
-            return { x: this.boardSize - 1, y: Math.floor(Math.random() * this.boardSize) };
+            return { x: this.width - 1, y: Math.floor(Math.random() * this.height) };
         } else {
-            return { x: Math.floor(Math.random() * this.boardSize), y: this.boardSize - 1 };
+            return { x: Math.floor(Math.random() * this.width), y: this.height - 1 };
         }
     }
 
@@ -62,7 +64,7 @@ export class MazeGenerator {
      * Genera un save item en una posición válida
      */
     generateSaveItem(excludePositions: Position[]): Position | null {
-        return generateFreePosition(excludePositions, this.boardSize);
+        return generateFreePosition(excludePositions, this.width, this.height);
     }
 
     /**
@@ -73,8 +75,8 @@ export class MazeGenerator {
         const obstacles: Obstacle[] = [];
         const traps: Position[] = [];
 
-        for (let y = 0; y < this.boardSize; y++) {
-            for (let x = 0; x < this.boardSize; x++) {
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
                 // Skip player start and exit
                 if ((x === playerStart.x && y === playerStart.y) ||
                     (x === exitPosition.x && y === exitPosition.y)) {
@@ -112,8 +114,8 @@ export class MazeGenerator {
             const nx = x + dir.x;
             const ny = y + dir.y;
             if (
-                nx >= 0 && nx < this.boardSize &&
-                ny >= 0 && ny < this.boardSize &&
+                nx >= 0 && nx < this.width &&
+                ny >= 0 && ny < this.height &&
                 !obstacles.some(obs => obs.x === nx && obs.y === ny) &&
                 !traps.some(trap => trap.x === nx && trap.y === ny)
             ) {
@@ -130,8 +132,8 @@ export class MazeGenerator {
     private isSolvable(playerStart: Position, exitPosition: Position, mazeData: MazeData): boolean {
         const queue = [{ x: playerStart.x, y: playerStart.y }];
         const visited = Array.from(
-            { length: this.boardSize },
-            () => Array(this.boardSize).fill(false)
+            { length: this.height },
+            () => Array(this.width).fill(false)
         );
         visited[playerStart.y][playerStart.x] = true;
 
@@ -154,8 +156,8 @@ export class MazeGenerator {
                 const ny = y + dir.y;
 
                 if (
-                    nx >= 0 && nx < this.boardSize &&
-                    ny >= 0 && ny < this.boardSize &&
+                    nx >= 0 && nx < this.width &&
+                    ny >= 0 && ny < this.height &&
                     !visited[ny][nx] &&
                     !mazeData.obstacles.some(obs => obs.x === nx && obs.y === ny) &&
                     !mazeData.traps.some(trap => trap.x === nx && trap.y === ny)
@@ -187,7 +189,8 @@ export class MazeGenerator {
     /**
      * Actualiza el tamaño del tablero
      */
-    setBoardSize(size: number): void {
-        this.boardSize = size;
+    setBoardDimensions(width: number, height: number): void {
+        this.width = width;
+        this.height = height;
     }
 }

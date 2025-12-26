@@ -2,9 +2,10 @@ import type { GameConfig } from './types/game.types';
 
 export const CONFIG: GameConfig = {
     // Configuración del juego
-    GAME_WIDTH: 600,
-    GAME_HEIGHT: 600,
-    BOARD_SIZE: 10,
+    GAME_WIDTH: 480,
+    GAME_HEIGHT: 720,
+    BOARD_WIDTH: 8,
+    BOARD_HEIGHT: 12,
     CELL_SIZE: 60,
 
     // Configuraciones de gameplay

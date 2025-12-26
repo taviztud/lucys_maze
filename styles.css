@@ -66,19 +66,26 @@ body {
 
 /* CENTER: Game container - CRT TV effect */
 #game-container {
-    position: relative;
-    width: calc(100vw - 16px);
-    height: calc(100vw - 16px);
-    max-width: 600px;
-    max-height: min(600px, calc(100vh - 140px));
-    border: 4px solid #2c3e50;
-    border-radius: 20px;
-    box-shadow:
-        0 0 15px #00f,
-        0 0 30px #00f,
-        inset 0 0 60px rgba(0, 0, 0, 0.9),
-        inset 0 0 20px rgba(0, 0, 0, 0.5);
+    /* Constrain max-width to fit within aspect ratio given height constraints */
+    /* Increased buffer to 180px to safely fit controls on all screens */
+    max-width: min(100%, calc((100dvh - 180px) * (480 / 720)));
+
+    width: 100%;
+    height: auto;
+
+    /* Explicitly constrain height as well to prevent rounding overflows */
+    max-height: calc(100dvh - 180px);
+
+    aspect-ratio: 480/720;
+    margin: 0 auto;
+
+    /* FORCE NO BORDER and NO GLOW */
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+
     background: #000;
+    border-radius: 20px;
     overflow: hidden;
     flex-shrink: 0;
 }

@@ -12,14 +12,16 @@ export class SpiderManager {
     private collision: CollisionSystem;
     private spiders: Spider[] = [];
     private cellSize: number;
-    private boardSize: number;
+    private width: number;
+    private height: number;
     private obstacles: Obstacle[] = [];
 
-    constructor(scene: Phaser.Scene, collision: CollisionSystem, cellSize: number, boardSize: number) {
+    constructor(scene: Phaser.Scene, collision: CollisionSystem, cellSize: number, width: number, height: number) {
         this.scene = scene;
         this.collision = collision;
         this.cellSize = cellSize;
-        this.boardSize = boardSize;
+        this.width = width;
+        this.height = height;
     }
 
     /**
@@ -29,7 +31,7 @@ export class SpiderManager {
         this.reset();
         this.obstacles = obstacles;
 
-        if (!this.boardSize) return;
+        if (!this.width || !this.height) return;
 
         let spiderCount = 0;
         // Spiders only appear from configured level
@@ -53,8 +55,8 @@ export class SpiderManager {
                 attempts++;
 
                 const pointA = {
-                    x: Phaser.Math.Between(0, this.boardSize - 1),
-                    y: Phaser.Math.Between(0, this.boardSize - 1)
+                    x: Phaser.Math.Between(0, this.width - 1),
+                    y: Phaser.Math.Between(0, this.height - 1)
                 };
 
                 if (!this.isValidPoint(pointA, exitPosition)) continue;
@@ -63,9 +65,9 @@ export class SpiderManager {
                 const pointB = { x: pointA.x, y: pointA.y };
 
                 if (axis === 0) {
-                    pointB.x = Phaser.Math.Between(0, this.boardSize - 1);
+                    pointB.x = Phaser.Math.Between(0, this.width - 1);
                 } else {
-                    pointB.y = Phaser.Math.Between(0, this.boardSize - 1);
+                    pointB.y = Phaser.Math.Between(0, this.height - 1);
                 }
 
                 const dist = Math.abs((pointB.x - pointA.x) + (pointB.y - pointA.y));
@@ -164,7 +166,7 @@ export class SpiderManager {
      * Verifica si un punto es válido para la araña
      */
     private isValidPoint(p: Position, exitPosition: Position): boolean {
-        if (p.x < 0 || p.x >= this.boardSize || p.y < 0 || p.y >= this.boardSize) {
+        if (p.x < 0 || p.x >= this.width || p.y < 0 || p.y >= this.height) {
             return false;
         }
         if (p.x === 0 && p.y === 0) return false; // Player start

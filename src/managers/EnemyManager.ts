@@ -40,11 +40,11 @@ export class EnemyManager {
         // Cap máximo de enemigos
         enemyCount = Math.min(enemyCount, CONFIG.ENEMIES.MAX_COUNT);
 
-        const boardSize = this.collision.getBoardSize();
+        const { width, height } = this.collision.getBoardDimensions();
 
         for (let i = 0; i < enemyCount; i++) {
             const allExcluded = [...excludePositions, ...this.enemies.map(e => ({ x: e.x, y: e.y }))];
-            const position = generateFreePosition(allExcluded, boardSize);
+            const position = generateFreePosition(allExcluded, width, height);
 
             if (!position) continue;
 
