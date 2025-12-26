@@ -9,16 +9,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./assets/index-Wwg_BQDk.js"></script>
+  <script type="module" crossorigin src="./assets/index-Ct3oQ6fr.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/phaser-0RJB29YE.js">
-  <link rel="stylesheet" crossorigin href="./assets/index-1Q2JhRRR.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-B09I1Ujl.css">
 </head>
 
 <body>
     <!-- TOP: Score/Level info like arcade -->
     <div id="info-bar">
         <span id="score">Puntos: 0</span>
-        <button id="restart-button">↻</button>
+        <span id="powerups">
+            <span id="shields">S: 0</span>
+            <span id="continues">C: 0</span>
+        </span>
+        <button id="restart-button">R</button>
         <span id="level">Nivel: 1</span>
     </div>
 
@@ -27,9 +31,9 @@
 
     <!-- BOTTOM: Audio controls -->
     <div id="audio-controls">
-        <button id="prev-music">◀</button>
-        <button id="toggle-music">🔊</button>
-        <button id="next-music">▶</button>
+        <button id="prev-music">&lt;</button>
+        <button id="toggle-music">M</button>
+        <button id="next-music">&gt;</button>
         <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5">
     </div>
 

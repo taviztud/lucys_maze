@@ -43,7 +43,26 @@ export const CONFIG: GameConfig = {
         MIN_LEVEL_FOR_TWO: 10,
         SINGLE_COUNT: 1,
         DOUBLE_COUNT: 2,
-        MOVE_TWEEN_DURATION_MS: 1000
+        MOVE_TWEEN_DURATION_MS: 1000,
+        FIRST_SPAWN_LEVEL: 5,
+        SECOND_ENEMY_INTERVAL: 7,
+        MAX_COUNT: 4
+    },
+
+    // Configuración de arañas
+    SPIDER: {
+        MIN_PATROL_DISTANCE: 3,
+        WAIT_DURATION_MS: 2000,
+        MOVE_SPEED: 0.05,
+        FIRST_SPAWN_LEVEL: 10,
+        SECOND_SPAWN_LEVEL: 15,
+        THIRD_SPAWN_LEVEL: 20
+    },
+
+    // Configuración de power-ups
+    POWERUPS: {
+        SPAWN_COIN_RATIO: 0.8,
+        SHIELD_PROBABILITY: 0.8
     },
 
     PERFORMANCE: {

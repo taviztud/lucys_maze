@@ -6,7 +6,7 @@
 
 
 
-![Version](https://img.shields.io/badge/version-0.1.2--alpha-blue)
+![Version](https://img.shields.io/badge/version-0.1.3--alpha-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Phaser](https://img.shields.io/badge/engine-Phaser%203-orange)
 ![TypeScript](https://img.shields.io/badge/language-TypeScript-blue)
@@ -20,7 +20,7 @@
 
 **Lucy's Maze** is a fast-paced arcade game inspired by "Tomb of the Mask". Help Lucy the Chihuahua navigate through intricate mazes, collect coins, avoid traps, and find the exit!
 
-### Features (Alpha 0.1.2)
+### Features (Alpha 0.1.3)
 - **Responsive Gameplay:** Works on Desktop and Mobile devices
 - **Controls:** Keyboard arrows (Desktop) and Swipe gestures (Mobile)
 - **High Scores:** Local leaderboard system to track your best runs
@@ -28,6 +28,10 @@
 - **Progressive Difficulty:** Levels become more challenging as you advance
 - **Background Music:** 14 unique tracks with shuffle playlist system
 - **Enemies:** Starting from level 5, enemies patrol the maze
+- **Spiders:** New enemy type that patrols between two points (from level 10)
+- **Power-ups:**
+  - **Shield:** Absorbs one hit without dying
+  - **Continue:** Allows you to resume the game after game over (one per run)
 
 ### Getting Started
 
@@ -51,6 +55,7 @@ npm run build
 |--------|---------|--------|
 | Move | Arrow Keys | Swipe |
 | Restart | R | - |
+| Continue | C (when available) | - |
 | Menu | M (from Game Over) | - |
 
 ### Project Structure
@@ -61,7 +66,8 @@ lucys-maze/
 │   └── sound/bg/     # Background music tracks
 ├── src/
 │   ├── scenes/       # GameScene, MenuScene
-│   ├── managers/     # ScoreManager
+│   ├── managers/     # GameState, Input, Audio, Enemy, Spider Managers
+│   ├── systems/      # Collision, GridRenderer, MazeGenerator
 │   ├── types/        # TypeScript type definitions
 │   ├── utils/        # Utility functions
 │   ├── Config.ts     # Game configuration
@@ -78,7 +84,7 @@ lucys-maze/
 
 **Lucy's Maze** es un juego arcade de ritmo rápido inspirado en "Tomb of the Mask". ¡Ayuda a Lucy la Chihuahua a navegar por laberintos intrincados, recolectar monedas, evitar trampas y encontrar la salida!
 
-### Características (Alfa 0.1.2)
+### Características (Alfa 0.1.3)
 - **Jugabilidad Responsiva:** Funciona en PC y dispositivos móviles
 - **Controles:** Flechas del teclado (PC) y gestos de deslizamiento (Móvil)
 - **Récords:** Sistema de puntuación alta local
@@ -86,6 +92,10 @@ lucys-maze/
 - **Dificultad Progresiva:** Los niveles se vuelven más difíciles a medida que avanzas
 - **Música de Fondo:** 14 pistas únicas con sistema de lista de reproducción aleatoria
 - **Enemigos:** A partir del nivel 5, los enemigos patrullan el laberinto
+- **Arañas:** Nuevo tipo de enemigo que patrulla entre dos puntos (desde nivel 10)
+- **Power-ups:**
+  - **Escudo:** Absorbe un golpe sin morir
+  - **Continuar:** Permite reanudar el juego tras perder (uno por partida)
 
 ### Comenzar
 
@@ -109,6 +119,7 @@ npm run build
 |--------|---------|--------|
 | Mover | Flechas | Deslizar |
 | Reiniciar | R | - |
+| Continuar | C (si está disponible) | - |
 | Menú | M (desde Game Over) | - |
 
 ### Estructura del Proyecto
@@ -119,7 +130,8 @@ lucys-maze/
 │   └── sound/bg/     # Pistas de música de fondo
 ├── src/
 │   ├── scenes/       # GameScene, MenuScene
-│   ├── managers/     # ScoreManager
+│   ├── managers/     # GameState, Input, Audio, Enemy, Spider Managers
+│   ├── systems/      # Collision, GridRenderer, MazeGenerator
 │   ├── types/        # Definiciones de tipos TypeScript
 │   ├── utils/        # Funciones utilitarias
 │   ├── Config.ts     # Configuración del juego

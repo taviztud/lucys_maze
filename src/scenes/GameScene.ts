@@ -1,1533 +1,525 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../Config';
-import { calculateSpriteScale, generateFreePosition } from '../utils/Utils';
-import { ScoreManager } from '../managers/ScoreManager';
-import type { Position, Direction, Obstacle, Enemy, SpriteCache, EventListenerEntry, MoveResult, FinalDestination, GridSprite } from '../types/game.types';
 
+// Managers
+import { InputManager } from '../managers/InputManager';
+import { AudioManager } from '../managers/AudioManager';
+import { PlayerController } from '../managers/PlayerController';
+import { EnemyManager } from '../managers/EnemyManager';
+import { SpiderManager } from '../managers/SpiderManager';
+import { UIManager } from '../managers/UIManager';
+import { GameStateManager } from '../managers/GameStateManager';
+
+// Systems
+import { CollisionSystem } from '../systems/CollisionSystem';
+import { MazeGenerator, type MazeData } from '../systems/MazeGenerator';
+import { GridRenderer } from '../systems/GridRenderer';
+
+import type { Position, Direction } from '../types/game.types';
+
+/**
+ * Escena principal del juego - Actúa como orquestador de todos los managers
+ */
 export class GameScene extends Phaser.Scene {
-    // State variables
+    // Configuration
     private boardSize: number;
     private cellSize: number;
-    private playerPosition: Position;
-    private exitPosition: Position;
-    private coins: Position[];
-    private obstacles: Obstacle[];
-    private traps: Position[];
-    private saves: Position[];
-    private enemies: Enemy[];
-    private score: number;
-    private level: number;
-    private gameOver: boolean;
-    private moving: boolean;
-    private moveDirection: Direction;
-    private desiredDirection: Direction;
-    private playerMoveTween: Phaser.Tweens.Tween | null;
-    private exitBlinkState: boolean;
-    private requireFreshPressAfterReset: boolean;
-    private initialCoinCount: number;
 
-    // Audio state
-    private availableMusicKeys: string[];
-    private backgroundMusic: Phaser.Sound.BaseSound | null;
-    private musicPlaylistOrder: string[];
-    private currentPlaylistIndex: number;
+    // Managers
+    private inputManager!: InputManager;
+    private audioManager!: AudioManager;
+    private playerController!: PlayerController;
+    private enemyManager!: EnemyManager;
+    private spiderManager!: SpiderManager;
+    private uiManager!: UIManager;
+    private gameState!: GameStateManager;
+
+    // Systems
+    private collision!: CollisionSystem;
+    private mazeGenerator!: MazeGenerator;
+    private gridRenderer!: GridRenderer;
+
+    // Game Data
+    private mazeData!: MazeData;
+    private saves: Position[] = [];      // Continue power-ups
+    private shields: Position[] = [];    // Shield power-ups
+    private playerStartPosition: Position = { x: 0, y: 0 };
+    private shieldSpawned: boolean = false;   // Track if shield already spawned this level
+    private continueSpawned: boolean = false; // Track if continue already spawned this level
 
     // Optimization
-    private collisionMap: any;
-    private lastEnemyUpdateTime: number;
-    private canUseSave: boolean;
-    private spriteCache: SpriteCache;
-    private eventListenerCleanup: EventListenerEntry[];
-
-    // Juice
-    private coinParticles: Phaser.GameObjects.Particles.ParticleEmitter | null;
-    private trailParticles: Phaser.GameObjects.Particles.ParticleEmitter | null;
-
-    // Game Objects
-    private player: Phaser.GameObjects.Sprite;
-    private exit: Phaser.GameObjects.Sprite;
-    private scoreText: Phaser.GameObjects.Text;
-    private levelText: Phaser.GameObjects.Text;
-    private newRecordText: Phaser.GameObjects.Text;
-    private menuText: Phaser.GameObjects.Text;
-    private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-    private restartKey: Phaser.Input.Keyboard.Key;
-    private menuKey: Phaser.Input.Keyboard.Key;
-    private exitBlinkTimer: Phaser.Time.TimerEvent;
-
-    // Visuals
-    private gridGroup: Phaser.GameObjects.Group;
-    private coinSprites: GridSprite[];
-    private obstacleSprites: Phaser.GameObjects.Sprite[];
-    private trapSprites: Phaser.GameObjects.Sprite[];
-    private playerSprite: Phaser.GameObjects.Sprite;
-    private exitSprite: Phaser.GameObjects.Sprite;
-    private saveSprite: Phaser.GameObjects.Sprite;
-    private playerDieSprite: Phaser.GameObjects.Sprite;
-    private savePulseTween: Phaser.Tweens.Tween;
-    private exitPulseTween: Phaser.Tweens.Tween;
-    private gameOverText: Phaser.GameObjects.Text;
-    private restartText: Phaser.GameObjects.Text;
+    private lastEnemyUpdateTime: number = 0;
+    private requireFreshPressAfterReset: boolean = false;
 
     constructor() {
         super('GameScene');
         this.boardSize = CONFIG.BOARD_SIZE;
         this.cellSize = CONFIG.CELL_SIZE;
-        this.playerPosition = { x: 0, y: 0 };
-        this.exitPosition = { x: CONFIG.BOARD_SIZE - 1, y: CONFIG.BOARD_SIZE - 1 };
-        this.coins = [];
-        this.obstacles = [];
-        this.traps = [];
-        this.saves = [];
-        this.enemies = [];
-        this.score = 0;
-        this.level = 1;
-        this.gameOver = false;
-        this.moving = false;
-        this.moveDirection = { dx: 0, dy: 0 };
-        this.desiredDirection = { dx: 0, dy: 0 };
-        this.playerMoveTween = null;
-        this.exitBlinkState = true;
-        this.requireFreshPressAfterReset = false;
-        this.initialCoinCount = 0;
-
-        // Audio state
-        this.availableMusicKeys = [];
-        this.backgroundMusic = null;
-        this.musicPlaylistOrder = [];
-        this.currentPlaylistIndex = 0;
-
-        // Optimization
-        this.collisionMap = null;
-        this.lastEnemyUpdateTime = 0;
-        this.canUseSave = false;
-        this.spriteCache = {
-            coins: [],
-            obstacles: [],
-            traps: []
-        };
-        this.eventListenerCleanup = [];
-
-        // Juice
-        this.coinParticles = null;
-        this.trailParticles = null;
     }
 
-    preload() {
+    preload(): void {
         try {
-            // Error handling
-            this.load.on('loaderror', (file) => {
-                console.warn('Asset not found:', file.key, file.src);
-                if (file.key.startsWith('backgroundMusic')) {
-                    const keyIndex = this.availableMusicKeys.indexOf(file.key);
-                    if (keyIndex > -1) {
-                        this.availableMusicKeys.splice(keyIndex, 1);
-                    }
-                }
-            });
-
-            this.load.on('filecomplete', (key) => {
-                if (key.startsWith('backgroundMusic')) {
-                    if (!this.availableMusicKeys.includes(key)) {
-                        this.availableMusicKeys.push(key);
-                    }
-                }
-            });
-
             // Load images
             this.load.image('player_stand', 'lucy_stand.png');
-            // ... (rest of images)
             this.load.image('player_run', 'lucy_run.png');
             this.load.image('player_die', 'lucy_die.png');
-            this.load.image('coin', 'tuto.png');
+            this.load.image('coin', 'coin_tuto.png');
             this.load.image('obstacle_brick', 'brick_1.png');
             this.load.image('obstacle_rock', 'rock_1.png');
             this.load.image('obstacle_tree', 'tree_1.png');
             this.load.image('trap', 'sping.png');
             this.load.image('exit', 'exit.png');
             this.load.image('enemy', 'enemy.png');
-            this.load.image('save', 'save.png');
+            this.load.image('spider', 'enemy_spider.png');
+            this.load.image('power_continue', 'power_continue.png');
+            this.load.image('power_shield', 'power_shield.png');
 
-            // Detect and load music
-            this.detectAndLoadMusic();
-
+            // Initialize audio manager early for preload
+            this.audioManager = new AudioManager(this);
+            this.audioManager.detectAndLoadMusic();
         } catch (error) {
             console.error('Critical error in preload:', error);
         }
     }
 
-    detectAndLoadMusic() {
-        this.availableMusicKeys = [];
-        const maxTracks = CONFIG.AUDIO.MAX_BG_TRACKS;
-        for (let i = 1; i <= maxTracks; i++) {
-            const paddedNumber = i.toString().padStart(3, '0');
-            const filename = `bg_${paddedNumber}.mp3`;
-            const key = `backgroundMusic${i - 1}`;
+    create(): void {
+        // Initialize all managers and systems
+        this.initializeManagers();
 
-            try {
-                this.load.audio(key, `sound/bg/${filename}`);
-            } catch (error) {
-                console.warn('Could not queue music file:', filename, error);
-            }
-        }
+        // Setup event listeners
+        this.setupEvents();
+
+        // Generate initial maze
+        this.startNewGame();
+
+        // Initialize audio
+        this.audioManager.initMusic();
+
+        // Setup UI event listeners
+        this.uiManager.setupEventListeners({
+            onMusicToggle: () => this.audioManager.togglePlayPause(),
+            onVolumeChange: (vol) => this.audioManager.setVolume(vol),
+            onNextMusic: () => this.audioManager.playNext(),
+            onPrevMusic: () => this.audioManager.playPrevious(),
+            onRestart: () => this.handleRestartButton()
+        });
+
+        // Update initial UI
+        this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
     }
 
-    create() {
-        // Music handling
-        const tryStartMusic = () => {
-            if (this.availableMusicKeys.length > 0) {
-                this.shuffleMusicPlaylist();
-                this.playRandomMusic();
-            } else {
-                this.time.delayedCall(500, () => {
-                    if (this.availableMusicKeys.length > 0) {
-                        this.shuffleMusicPlaylist();
-                        this.playRandomMusic();
-                    }
-                });
-            }
-        };
-
-        if (this.sound.locked) {
-            this.input.once('pointerdown', () => this.sound.unlock());
-            if (this.input.keyboard) this.input.keyboard.once('keydown', () => this.sound.unlock());
-            this.sound.once('unlocked', tryStartMusic);
-        } else {
-            this.time.delayedCall(200, tryStartMusic);
-        }
-
-        // Create grid
-        this.createGrid();
-
-        // Game Over Text
-        this.gameOverText = this.add.text(CONFIG.GAME_WIDTH / 2, CONFIG.GAME_HEIGHT / 2, 'GAME OVER', {
-            fontSize: CONFIG.UI.GAME_OVER_FONT_SIZE,
-            fontFamily: CONFIG.UI.FONT_FAMILY,
-            color: '#ff0000',
-            stroke: '#ffffff',
-            strokeThickness: 4
-        });
-        this.gameOverText.setOrigin(0.5);
-        this.gameOverText.setDepth(100);
-        this.gameOverText.setVisible(false);
-
-        // Restart Text
-        this.restartText = this.add.text(CONFIG.GAME_WIDTH / 2, CONFIG.GAME_HEIGHT / 2 + CONFIG.UI.RESTART_OFFSET_Y, 'PRESS R TO RESTART', {
-            fontSize: CONFIG.UI.RESTART_FONT_SIZE,
-            fontFamily: CONFIG.UI.FONT_FAMILY,
-            color: '#ffff00',
-            align: 'center'
-        });
-        this.restartText.setOrigin(0.5);
-        this.restartText.setDepth(100);
-        this.restartText.setVisible(false);
-
-        // Initialize maze
-        this.generateRandomExit();
-        this.generateMaze();
-        this.initialCoinCount = this.coins.length;
-        this.buildCollisionMap();
-
-        // Draw game
-        this.drawGame();
-
-        // Controls
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.restartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
-        this.menuKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
-
-        // Exit animation - smooth pulsing instead of simple blink
-        this.startExitAnimation();
-
-        // UI Event Listeners
-        this.setupUIEventListeners();
-
-        // Keyboard Input
-        this.input.keyboard.on('keydown', (event) => {
-            switch (event.code) {
-                case 'ArrowLeft':
-                    this.desiredDirection = { dx: -1, dy: 0 };
-                    break;
-                case 'ArrowRight':
-                    this.desiredDirection = { dx: 1, dy: 0 };
-                    break;
-                case 'ArrowUp':
-                    this.desiredDirection = { dx: 0, dy: -1 };
-                    break;
-                case 'ArrowDown':
-                    this.desiredDirection = { dx: 0, dy: 1 };
-                    break;
-                default:
-                    break;
-            }
-
-            if (!this.moving && (this.desiredDirection.dx !== 0 || this.desiredDirection.dy !== 0) && !this.gameOver) {
-                this.movePlayer(this.desiredDirection.dx, this.desiredDirection.dy);
-                this.requireFreshPressAfterReset = false;
-            }
-        });
-
-        // Touch/Swipe controls for mobile
-        this.setupTouchControls();
-
-        this.updateScoreAndLevelTexts();
-
-        if (this.level >= 5) {
-            this.initEnemies();
-        }
-
-        // Juice
-        this.coinParticles = this.add.particles(0, 0, 'coin', {
-            speed: { min: 50, max: 150 },
-            scale: { start: 0.4, end: 0 },
-            lifespan: 600,
-            blendMode: 'ADD',
-            quantity: 10,
-            emitting: false
-        });
-
-        this.trailParticles = this.add.particles(0, 0, 'player_run', {
-            speed: 0,
-            scale: { start: calculateSpriteScale('player_run', this.cellSize, this) * 0.9, end: 0.7 },
-            alpha: { start: 0.15, end: 0 },
-            lifespan: 1000,
-            blendMode: 'ADD',
-            frequency: 140,
-            emitting: false
-        });
-    }
-
-    update(time, delta) {
-        if (this.gameOver) {
-            if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
-                this.score = 0;
-                this.level = 1;
-                this.updateScoreAndLevelTexts();
+    update(time: number, _delta: number): void {
+        // Handle game over input
+        if (this.gameState.isGameOver) {
+            // R = Full restart (reset everything)
+            if (this.inputManager.isRestartJustPressed()) {
+                this.gameState.reset(true);
+                this.updatePowerUpsUI();
+                this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
                 this.resetGame(true);
             }
-            if (Phaser.Input.Keyboard.JustDown(this.menuKey)) {
+            // C = Continue (use power-up, keep level and score)
+            if (this.inputManager.isContinueJustPressed() && this.gameState.useContinue()) {
+                this.updatePowerUpsUI();
+                this.resetGame(false);
+            }
+            if (this.inputManager.isMenuJustPressed()) {
                 this.returnToMenu();
             }
             return;
         }
 
-        // Enemy updates
+        // Update enemies with throttling
         if (time > this.lastEnemyUpdateTime + CONFIG.PERFORMANCE.ENEMY_UPDATE_THROTTLE_MS) {
-            this.updateEnemies();
+            this.enemyManager.update();
+
+            // Update spiders and check collision
+            const playerPos = this.playerController.getPosition();
+            const playerHit = this.spiderManager.update(time, playerPos);
+            if (playerHit && !this.gameState.isGameOver) {
+                this.handleDeath();
+            }
+
             this.lastEnemyUpdateTime = time;
         }
     }
 
-    createGrid() {
-        // Background color
-        this.cameras.main.setBackgroundColor(CONFIG.UI.MAIN_BACKGROUND_COLOR);
+    /**
+     * Inicializa todos los managers y sistemas
+     */
+    private initializeManagers(): void {
+        // Core systems
+        this.collision = new CollisionSystem(this.boardSize);
+        this.mazeGenerator = new MazeGenerator(this.boardSize);
+        this.gridRenderer = new GridRenderer(this, this.cellSize, this.boardSize);
 
-        // Neon color based on level
-        const neonColor = CONFIG.BACKGROUND_COLORS[(this.level - 1) % CONFIG.BACKGROUND_COLORS.length];
+        // Managers
+        this.inputManager = new InputManager(this);
+        // audioManager already initialized in preload
+        this.playerController = new PlayerController(this, this.collision, this.cellSize);
+        this.enemyManager = new EnemyManager(this, this.collision, this.cellSize);
+        this.spiderManager = new SpiderManager(this, this.collision, this.cellSize, this.boardSize);
+        this.uiManager = new UIManager();
+        this.gameState = new GameStateManager(this);
 
-        // Create grid group
-        if (this.gridGroup && this.gridGroup.children) {
-            this.gridGroup.clear(true, true);
-        } else {
-            this.gridGroup = this.add.group();
-        }
+        // Setup input
+        this.inputManager.setup();
 
-        // Draw grid
-        const graphics = this.add.graphics();
-        graphics.lineStyle(1, neonColor, CONFIG.GRID_ALPHA);
-
-        for (let i = 0; i <= this.boardSize; i++) {
-            // Vertical lines
-            graphics.moveTo(i * this.cellSize, 0);
-            graphics.lineTo(i * this.cellSize, this.boardSize * this.cellSize);
-
-            // Horizontal lines
-            graphics.moveTo(0, i * this.cellSize);
-            graphics.lineTo(this.boardSize * this.cellSize, i * this.cellSize);
-        }
-
-        graphics.strokePath();
-        this.gridGroup.add(graphics);
-
-        // Add dots at intersections
-        for (let y = 0; y < this.boardSize; y++) {
-            for (let x = 0; x < this.boardSize; x++) {
-                const dot = this.add.rectangle(
-                    x * this.cellSize + this.cellSize / 2,
-                    y * this.cellSize + this.cellSize / 2,
-                    2,
-                    2,
-                    neonColor
-                );
-                dot.setAlpha(0.6);
-                this.gridGroup.add(dot);
-            }
-        }
-    }
-
-    generateRandomExit() {
-        const side = Math.floor(Math.random() * 2);
-        if (side === 0) {
-            this.exitPosition = { x: this.boardSize - 1, y: Math.floor(Math.random() * this.boardSize) };
-        } else {
-            this.exitPosition = { x: Math.floor(Math.random() * this.boardSize), y: this.boardSize - 1 };
-        }
-    }
-
-    generateMaze() {
-        try {
-            if (!this.boardSize || this.boardSize < 3) {
-                console.error('generateMaze: Invalid boardSize:', this.boardSize);
-                return;
-            }
-
-            let attempts = 0;
-            const maxAttempts = CONFIG.MAZE_GENERATION.MAX_ATTEMPTS;
-
-            do {
-                attempts++;
-                this.coins.length = 0;
-                this.obstacles.length = 0;
-                this.traps.length = 0;
-                this.saves.length = 0;
-
-                for (let y = 0; y < this.boardSize; y++) {
-                    for (let x = 0; x < this.boardSize; x++) {
-                        if ((x !== 0 || y !== 0) && (x !== this.exitPosition.x || y !== this.exitPosition.y)) {
-                            if (Math.random() < CONFIG.MAZE_GENERATION.OBSTACLE_PROBABILITY && this.hasEnoughSpace(x, y)) {
-                                const obstacleTypes = ['brick', 'rock', 'tree'];
-                                const randomType = obstacleTypes[Phaser.Math.Between(0, obstacleTypes.length - 1)] as 'brick' | 'rock' | 'tree';
-                                this.obstacles.push({ x, y, type: randomType });
-                            } else if (Math.random() < CONFIG.MAZE_GENERATION.COIN_PROBABILITY) {
-                                this.coins.push({ x, y });
-                            } else if (Math.random() < CONFIG.MAZE_GENERATION.TRAP_PROBABILITY && this.hasEnoughSpace(x, y)) {
-                                this.traps.push({ x, y });
-                            }
-                        }
-                    }
-                }
-            } while (!this.isSolvable() && attempts < maxAttempts);
-
-            if (attempts >= maxAttempts) {
-                console.warn('generateMaze: Max attempts reached, generating simple maze');
-                this.coins.length = 0;
-                this.obstacles.length = 0;
-                this.traps.length = 0;
-                this.saves.length = 0;
-                this.coins.push({ x: 2, y: 2 }, { x: 5, y: 5 }, { x: 7, y: 3 });
-                this.obstacles.push({ x: 3, y: 4, type: 'brick' }, { x: 6, y: 7, type: 'rock' });
-            }
-        } catch (error) {
-            console.error('Error in generateMaze:', error);
-            this.coins.length = 0;
-            this.obstacles.length = 0;
-            this.traps.length = 0;
-            this.saves.length = 0;
-            this.coins.push({ x: 1, y: 1 });
-        }
-    }
-
-    isSolvable() {
-        const queue = [{ x: this.playerPosition.x, y: this.playerPosition.y }];
-        const visited = Array.from({ length: this.boardSize }, () => Array(this.boardSize).fill(false));
-        visited[this.playerPosition.y][this.playerPosition.x] = true;
-
-        const directions = [
-            { x: 0, y: -1 },
-            { x: 1, y: 0 },
-            { x: 0, y: 1 },
-            { x: -1, y: 0 }
-        ];
-
-        while (queue.length > 0) {
-            const { x, y } = queue.shift();
-
-            if (x === this.exitPosition.x && y === this.exitPosition.y) {
-                return true;
-            }
-
-            for (let dir of directions) {
-                const nx = x + dir.x;
-                const ny = y + dir.y;
-
-                if (
-                    nx >= 0 && nx < this.boardSize &&
-                    ny >= 0 && ny < this.boardSize &&
-                    !visited[ny][nx] &&
-                    !this.obstacles.some(obstacle => obstacle.x === nx && obstacle.y === ny) &&
-                    !this.traps.some(trap => trap.x === nx && trap.y === ny)
-                ) {
-                    visited[ny][nx] = true;
-                    queue.push({ x: nx, y: ny });
-                }
-            }
-        }
-
-        return false;
-    }
-
-    hasEnoughSpace(x, y) {
-        const directions = [
-            { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 },
-            { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: 1, y: 1 }
-        ];
-
-        let freeSpaces = 0;
-        for (let dir of directions) {
-            const nx = x + dir.x;
-            const ny = y + dir.y;
-            if (
-                nx >= 0 && nx < this.boardSize &&
-                ny >= 0 && ny < this.boardSize &&
-                !this.obstacles.some(obs => obs.x === nx && obs.y === ny) &&
-                !this.traps.some(trap => trap.x === nx && trap.y === ny)
-            ) {
-                freeSpaces++;
-            }
-        }
-
-        return freeSpaces >= CONFIG.MAZE_GENERATION.MIN_FREE_SPACES;
-    }
-
-    buildCollisionMap() {
-        if (!this.boardSize || this.boardSize < 1) {
-            console.error('buildCollisionMap: Invalid boardSize:', this.boardSize);
-            return;
-        }
-
-        try {
-            this.collisionMap = Array.from({ length: this.boardSize }, () => Array(this.boardSize).fill(false));
-            this.obstacles.forEach(obstacle => {
-                if (obstacle.x >= 0 && obstacle.x < this.boardSize && obstacle.y >= 0 && obstacle.y < this.boardSize) {
-                    this.collisionMap[obstacle.y][obstacle.x] = true;
-                }
-            });
-        } catch (error) {
-            console.error('Error building collision map:', error);
-            this.collisionMap = Array.from({ length: this.boardSize || 10 }, () => Array(this.boardSize || 10).fill(false));
-        }
-    }
-
-    drawGame() {
-        // Clear existing sprites
-        this.clearSpriteCache();
-        this.coinSprites = this.coinSprites || [];
-        this.obstacleSprites = this.obstacleSprites || [];
-        this.trapSprites = this.trapSprites || [];
-
-        // Draw Player
-        if (!this.playerSprite) {
-            this.playerSprite = this.add.sprite(
-                this.playerPosition.x * this.cellSize + this.cellSize / 2,
-                this.playerPosition.y * this.cellSize + this.cellSize / 2,
-                'player_stand'
-            );
-        } else {
-            this.playerSprite.setPosition(
-                this.playerPosition.x * this.cellSize + this.cellSize / 2,
-                this.playerPosition.y * this.cellSize + this.cellSize / 2
-            );
-            this.playerSprite.setVisible(true);
-            this.playerSprite.setDepth(10); // Ensure player is on top
-        }
-        this.adjustPlayerScaleAndRotation();
-
-        // Draw Exit
-        if (!this.exitSprite) {
-            this.exitSprite = this.add.sprite(
-                this.exitPosition.x * this.cellSize + this.cellSize / 2,
-                this.exitPosition.y * this.cellSize + this.cellSize / 2,
-                'exit'
-            );
-        } else {
-            this.exitSprite.setPosition(
-                this.exitPosition.x * this.cellSize + this.cellSize / 2,
-                this.exitPosition.y * this.cellSize + this.cellSize / 2
-            );
-            this.exitSprite.setVisible(true);
-        }
-        const exitScale = calculateSpriteScale('exit', this.cellSize, this);
-        this.exitSprite.setScale(exitScale);
-        this.startExitAnimation();
-
-        // Draw Coins
-        this.coinSprites = [];
-        this.coins.forEach((coin, index) => {
-            let coinSprite;
-            if (this.spriteCache.coins[index] && this.spriteCache.coins[index].active) {
-                coinSprite = this.spriteCache.coins[index];
-                coinSprite.setPosition(
-                    coin.x * this.cellSize + this.cellSize / 2,
-                    coin.y * this.cellSize + this.cellSize / 2
-                );
-                coinSprite.setVisible(true);
-            } else {
-                coinSprite = this.add.sprite(
-                    coin.x * this.cellSize + this.cellSize / 2,
-                    coin.y * this.cellSize + this.cellSize / 2,
-                    'coin'
-                );
-                const coinScale = calculateSpriteScale('coin', this.cellSize, this);
-                coinSprite.setScale(coinScale);
-                this.spriteCache.coins[index] = coinSprite;
-            }
-            // Store grid position for easy removal
-            (coinSprite as GridSprite).gridX = coin.x;
-            (coinSprite as GridSprite).gridY = coin.y;
-            this.coinSprites.push(coinSprite as GridSprite);
-        });
-
-        // Draw Obstacles
-        this.obstacleSprites = [];
-        this.obstacles.forEach((obstacle, index) => {
-            let obstacleSprite;
-            if (this.spriteCache.obstacles[index] && this.spriteCache.obstacles[index].active) {
-                obstacleSprite = this.spriteCache.obstacles[index];
-                obstacleSprite.setPosition(
-                    obstacle.x * this.cellSize + this.cellSize / 2,
-                    obstacle.y * this.cellSize + this.cellSize / 2
-                );
-                obstacleSprite.setTexture(`obstacle_${obstacle.type}`);
-                obstacleSprite.setVisible(true);
-            } else {
-                obstacleSprite = this.add.sprite(
-                    obstacle.x * this.cellSize + this.cellSize / 2,
-                    obstacle.y * this.cellSize + this.cellSize / 2,
-                    `obstacle_${obstacle.type}`
-                );
-                const obstacleScale = calculateSpriteScale(`obstacle_${obstacle.type}`, this.cellSize, this);
-                obstacleSprite.setScale(obstacleScale);
-                this.spriteCache.obstacles[index] = obstacleSprite;
-            }
-            // Tag sprite with obstacle data for tree animation
-            (obstacleSprite as any).obstacleType = obstacle.type;
-            (obstacleSprite as any).gridX = obstacle.x;
-            (obstacleSprite as any).gridY = obstacle.y;
-            this.obstacleSprites.push(obstacleSprite);
-        });
-
-        // Draw Traps
-        this.trapSprites = [];
-        this.traps.forEach((trap, index) => {
-            let trapSprite;
-            if (this.spriteCache.traps[index] && this.spriteCache.traps[index].active) {
-                trapSprite = this.spriteCache.traps[index];
-                trapSprite.setPosition(
-                    trap.x * this.cellSize + this.cellSize / 2,
-                    trap.y * this.cellSize + this.cellSize / 2
-                );
-                trapSprite.setVisible(true);
-            } else {
-                trapSprite = this.add.sprite(
-                    trap.x * this.cellSize + this.cellSize / 2,
-                    trap.y * this.cellSize + this.cellSize / 2,
-                    'trap'
-                );
-                const trapScale = calculateSpriteScale('trap', this.cellSize, this);
-                trapSprite.setScale(trapScale);
-                this.spriteCache.traps[index] = trapSprite;
-            }
-
-            // Spinning animation with acceleration (slow start, speed up)
-            // Staggered delays so traps don't all spin at the same time
-            const staggerDelay = Phaser.Math.Between(0, 2000);
-            this.time.delayedCall(staggerDelay, () => {
-                if (trapSprite && trapSprite.active) {
-                    this.tweens.add({
-                        targets: trapSprite,
-                        angle: 360,
-                        duration: 1500,
-                        ease: 'Cubic.InOut',  // Starts slow, accelerates, then slows
-                        repeat: -1,
-                        onRepeat: (tween) => {
-                            trapSprite.setAngle(0);  // Reset angle for smooth loop
-                        }
-                    });
-                }
-            });
-
-            this.trapSprites.push(trapSprite);
-        });
-
-        // Draw Save
-        if (this.saves.length > 0) {
-            const save = this.saves[0];
-            if (!this.saveSprite) {
-                this.saveSprite = this.add.sprite(
-                    save.x * this.cellSize + this.cellSize / 2,
-                    save.y * this.cellSize + this.cellSize / 2,
-                    'save'
-                );
-            } else {
-                this.saveSprite.setPosition(
-                    save.x * this.cellSize + this.cellSize / 2,
-                    save.y * this.cellSize + this.cellSize / 2
-                );
-                this.saveSprite.setVisible(true);
-            }
-            const saveScale = calculateSpriteScale('save', this.cellSize, this);
-            this.saveSprite.setScale(saveScale);
-            this.saveSprite.setAlpha(1);
-
-            // Pulse tween
-            if (this.savePulseTween) {
-                this.savePulseTween.stop();
-            }
-            this.savePulseTween = this.tweens.add({
-                targets: this.saveSprite,
-                scaleX: { from: saveScale * 0.95, to: saveScale * 1.08 },
-                scaleY: { from: saveScale * 0.95, to: saveScale * 1.08 },
-                alpha: { from: 0.9, to: 1.0 },
-                ease: 'Sine.InOut',
-                duration: 600,
-                yoyo: true,
-                repeat: -1
-            });
-        } else if (this.saveSprite) {
-            this.saveSprite.setVisible(false);
-        }
-
-        // Hide unused sprites
-        this.hideUnusedSprites(this.coinSprites, 'coins');
-        this.hideUnusedSprites(this.obstacleSprites, 'obstacles');
-        this.hideUnusedSprites(this.trapSprites, 'traps');
-
-        // Update enemy sprites
-        if (this.level >= 5) {
-            this.enemies.forEach(enemy => {
-                if (enemy.sprite) {
-                    if (enemy.direction.dx === -1) {
-                        enemy.sprite.setFlipX(true);
-                    } else if (enemy.direction.dx === 1) {
-                        enemy.sprite.setFlipX(false);
-                    }
-                }
-            });
-        }
-    }
-
-    movePlayer(dx, dy) {
-        if (this.gameOver || this.moving) return;
-        if (dx === 0 && dy === 0) return;
-
-        this.moveDirection = { dx, dy };
-        const moveResult = this.calculateMoveUntilObstacle(this.playerPosition.x, this.playerPosition.y, dx, dy);
-
-        if (moveResult.distance === 0) {
-            this.resetMovementState();
-            return;
-        }
-
-        this.startMovement();
-        const baseStepDuration = this.calculateStepDuration();
-        const finalDestination = this.calculateFinalDestination(dx, dy, moveResult);
-
-        this.executeMovementTween(dx, dy, baseStepDuration, finalDestination);
-    }
-
-    // Helper: Reset movement state when no movement possible
-    resetMovementState() {
-        this.moveDirection = { dx: 0, dy: 0 };
-        if (this.playerSprite) {
-            this.playerSprite.setTexture('player_stand');
-            this.adjustPlayerScaleAndRotation();
-        }
-    }
-
-    // Helper: Initialize movement state
-    startMovement() {
-        this.moving = true;
-        this.playerSprite.setTexture('player_run');
-        this.adjustPlayerScaleAndRotation();
-
-        if (this.trailParticles) {
-            this.trailParticles.start();
-            this.trailParticles.startFollow(this.playerSprite);
-        }
-    }
-
-    // Helper: Calculate step duration based on level
-    calculateStepDuration() {
-        return Math.max(
-            CONFIG.PERFORMANCE.PLAYER_MIN_STEP_DURATION_MS,
-            CONFIG.PERFORMANCE.PLAYER_BASE_DURATION_MS - this.level * CONFIG.PERFORMANCE.PLAYER_STEP_DEC_PER_LEVEL
+        // Setup turn callbacks for direction change during movement
+        this.playerController.setTurnCallbacks(
+            () => this.inputManager.getDesiredDirection(),
+            (dx, dy) => this.handlePlayerMove({ dx, dy })
         );
+
+        // Create game over UI
+        this.gameState.createGameOverUI();
     }
 
-    // Helper: Find the actual destination considering traps, enemies, exit
-    calculateFinalDestination(dx, dy, moveResult) {
-        const startX = this.playerPosition.x;
-        const startY = this.playerPosition.y;
-        const finalDestination = { x: moveResult.x, y: moveResult.y, step: moveResult.distance };
-
-        for (let i = 1; i <= moveResult.distance; i++) {
-            const checkX = startX + (dx * i);
-            const checkY = startY + (dy * i);
-
-            // Stop at trap
-            if (this.isTrapOptimized(checkX, checkY)) {
-                return { x: checkX, y: checkY, step: i };
-            }
-            // Stop at enemy
-            if (this.enemies.some(e => Math.round(e.x) === checkX && Math.round(e.y) === checkY)) {
-                return { x: checkX, y: checkY, step: i };
-            }
-            // Stop at exit
-            if (checkX === this.exitPosition.x && checkY === this.exitPosition.y) {
-                return { x: checkX, y: checkY, step: i };
-            }
-        }
-
-        return finalDestination;
-    }
-
-    // Helper: Execute the movement tween
-    executeMovementTween(dx, dy, baseStepDuration, finalDestination) {
-        const startX = this.playerPosition.x;
-        const startY = this.playerPosition.y;
-        let lastStepProcessed = -1;
-
-        this.playerMoveTween = this.tweens.add({
-            targets: this.playerSprite,
-            x: finalDestination.x * this.cellSize + this.cellSize / 2,
-            y: finalDestination.y * this.cellSize + this.cellSize / 2,
-            duration: baseStepDuration * finalDestination.step,
-            ease: 'Linear',
-            onUpdate: (tween) => {
-                const result = this.onMovementUpdate(tween, dx, dy, startX, startY, finalDestination, lastStepProcessed);
-                if (result !== null) lastStepProcessed = result;
-            },
-            onComplete: () => {
-                this.onMovementComplete(finalDestination);
-            },
-            callbackScope: this
-        });
-    }
-
-    // Helper: Process each step during movement
-    onMovementUpdate(tween, dx, dy, startX, startY, finalDestination, lastStepProcessed) {
-        const progress = tween.progress;
-        const currentStep = Math.floor(progress * finalDestination.step);
-        const stepStart = Math.max(0, lastStepProcessed + 1);
-
-        for (let step = stepStart; step <= currentStep; step++) {
-            const newLogicalX = startX + (dx * step);
-            const newLogicalY = startY + (dy * step);
-
-            if (newLogicalX !== this.playerPosition.x || newLogicalY !== this.playerPosition.y) {
-                this.playerPosition.x = newLogicalX;
-                this.playerPosition.y = newLogicalY;
-
-                this.processItemsAtPosition(this.playerPosition.x, this.playerPosition.y);
-
-                // Check death conditions
-                if (this.isTrapOptimized(this.playerPosition.x, this.playerPosition.y)) {
-                    this.handleDeath();
-                    return null;
-                }
-                if (this.enemies.some(e => Math.round(e.x) === this.playerPosition.x && Math.round(e.y) === this.playerPosition.y)) {
-                    this.handleDeath();
-                    return null;
-                }
-
-                // Check level complete
-                if (this.playerPosition.x === this.exitPosition.x && this.playerPosition.y === this.exitPosition.y) {
-                    this.handleLevelComplete();
-                    return null;
-                }
-
-                // Check for turn opportunity
-                if (this.checkTurnOpportunity(tween)) {
-                    return null;
-                }
-            }
-        }
-        return currentStep;
-    }
-
-    // Helper: Check if player can turn at current position
-    checkTurnOpportunity(tween) {
-        if ((this.desiredDirection.dx !== 0 || this.desiredDirection.dy !== 0) &&
-            (this.desiredDirection.dx !== this.moveDirection.dx || this.desiredDirection.dy !== this.moveDirection.dy)) {
-            const turnNextX = this.playerPosition.x + this.desiredDirection.dx;
-            const turnNextY = this.playerPosition.y + this.desiredDirection.dy;
-
-            if (!this.isCollisionOptimized(turnNextX, turnNextY)) {
-                this.playerSprite.setPosition(
-                    this.playerPosition.x * this.cellSize + this.cellSize / 2,
-                    this.playerPosition.y * this.cellSize + this.cellSize / 2
-                );
-                tween.stop();
-                this.moving = false;
-                this.movePlayer(this.desiredDirection.dx, this.desiredDirection.dy);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Helper: Finalize movement
-    onMovementComplete(finalDestination) {
-        if (this.trailParticles) this.trailParticles.stop();
-
-        this.playerPosition.x = finalDestination.x;
-        this.playerPosition.y = finalDestination.y;
-
-        if (finalDestination.step > 0 && !this.gameOver) {
-            this.cameras.main.shake(100, 0.005);
-        }
-
-        this.processItemsAtPosition(this.playerPosition.x, this.playerPosition.y);
-
-        if (this.isTrapOptimized(this.playerPosition.x, this.playerPosition.y)) {
-            this.handleDeath();
-            return;
-        }
-        if (this.playerPosition.x === this.exitPosition.x && this.playerPosition.y === this.exitPosition.y) {
-            this.handleLevelComplete();
-            return;
-        }
-
-        this.moving = false;
-        this.playerMoveTween = null;
-        this.moveDirection = { dx: 0, dy: 0 };
-        this.playerSprite.setTexture('player_stand');
-        this.adjustPlayerScaleAndRotation();
-    }
-
-    clearSpriteCache() {
-        Object.keys(this.spriteCache).forEach(key => {
-            this.spriteCache[key].forEach(sprite => {
-                if (sprite && sprite.destroy) {
-                    sprite.destroy();
-                }
-            });
-            this.spriteCache[key] = [];
-        });
-    }
-
-    hideUnusedSprites(usedSprites, cacheKey) {
-        const cache = this.spriteCache[cacheKey];
-        for (let i = usedSprites.length; i < cache.length; i++) {
-            if (cache[i]) {
-                cache[i].setVisible(false);
-            }
-        }
-    }
-
-    adjustPlayerScaleAndRotation() {
-        if (!this.playerSprite) return;
-
-        const playerScale = calculateSpriteScale(this.playerSprite.texture.key, this.cellSize, this);
-        this.playerSprite.setScale(playerScale);
-
-        if (this.moveDirection.dx === 1) {
-            this.playerSprite.setAngle(0);
-            this.playerSprite.setFlipX(false);
-        } else if (this.moveDirection.dx === -1) {
-            this.playerSprite.setAngle(0);
-            this.playerSprite.setFlipX(true);
-        } else if (this.moveDirection.dy === -1) {
-            this.playerSprite.setAngle(-90);
-            this.playerSprite.setFlipX(false);
-        } else if (this.moveDirection.dy === 1) {
-            this.playerSprite.setAngle(90);
-            this.playerSprite.setFlipX(false);
-        }
-    }
-
-    calculateMoveUntilObstacle(startX, startY, dx, dy) {
-        let currentX = startX;
-        let currentY = startY;
-        let distance = 0;
-
-        while (true) {
-            let nextX = currentX + dx;
-            let nextY = currentY + dy;
-
-            if (this.isCollisionOptimized(nextX, nextY)) {
-                break;
-            }
-
-            currentX = nextX;
-            currentY = nextY;
-            distance++;
-        }
-
-        return { x: currentX, y: currentY, distance };
-    }
-
-    processItemsAtPosition(x, y) {
-        // Coins
-        for (let i = this.coins.length - 1; i >= 0; i--) {
-            if (this.coins[i].x === x && this.coins[i].y === y) {
-                // Particles
-                if (this.coinParticles) {
-                    this.coinParticles.emitParticleAt(
-                        x * this.cellSize + this.cellSize / 2,
-                        y * this.cellSize + this.cellSize / 2
-                    );
-                }
-
-                this.coins.splice(i, 1);
-                this.score += 10;
-                this.updateScoreAndLevelTexts();
-
-                // Remove sprite
-                for (let j = this.coinSprites.length - 1; j >= 0; j--) {
-                    if (this.coinSprites[j].gridX === x && this.coinSprites[j].gridY === y) {
-                        this.coinSprites[j].destroy();
-                        this.coinSprites.splice(j, 1);
-                        break;
-                    }
-                }
-
-                // Generate save item
-                if (this.initialCoinCount > 0) {
-                    const collected = this.initialCoinCount - this.coins.length;
-                    const ratio = collected / this.initialCoinCount;
-                    if (ratio > 0.7 && this.saves.length === 0) {
-                        this.generateSaveItem();
-                        this.drawGame();
-                    }
-                }
-                break;
-            }
-        }
-
-        // Saves
-        if (this.saves.length > 0) {
-            const save = this.saves[0];
-            if (save.x === x && save.y === y) {
-                this.canUseSave = true;
-                this.saves.splice(0, 1);
-                if (this.saveSprite) {
-                    if (this.savePulseTween) {
-                        this.savePulseTween.stop();
-                        this.savePulseTween = null;
-                    }
-                    this.saveSprite.destroy();
-                    this.saveSprite = null;
-                }
-            }
-        }
-
-        // Animate nearby trees when Lucy passes
-        this.animateNearbyTrees(x, y);
-    }
-
-    animateNearbyTrees(playerX: number, playerY: number) {
-        this.obstacles.forEach((obstacle, index) => {
-            if (obstacle.type !== 'tree') return;
-
-            // Check if tree is adjacent (within 1 cell)
-            const distX = Math.abs(obstacle.x - playerX);
-            const distY = Math.abs(obstacle.y - playerY);
-            if (distX <= 1 && distY <= 1 && (distX + distY) > 0) {
-                const treeSprite = this.spriteCache.obstacles[index];
-                if (treeSprite && treeSprite.active) {
-                    // Subtle sway animation - only if not already animating
-                    if (!(treeSprite as any).isSwaying) {
-                        (treeSprite as any).isSwaying = true;
-                        const swayDirection = playerX < obstacle.x ? -1 : 1;
-                        this.tweens.add({
-                            targets: treeSprite,
-                            angle: { from: 0, to: swayDirection * 8 },
-                            duration: 150,
-                            ease: 'Sine.InOut',
-                            yoyo: true,
-                            repeat: 1,
-                            onComplete: () => {
-                                treeSprite.setAngle(0);
-                                (treeSprite as any).isSwaying = false;
-                            }
-                        });
-                    }
-                }
-            }
-        });
-    }
-
-    isCollisionOptimized(x, y) {
-        if (x < 0 || x >= this.boardSize || y < 0 || y >= this.boardSize) {
-            return true;
-        }
-        return this.collisionMap && this.collisionMap[y] && this.collisionMap[y][x];
-    }
-
-    isTrapOptimized(x, y) {
-        if (x < 0 || x >= this.boardSize || y < 0 || y >= this.boardSize) {
-            return false;
-        }
-        return this.traps.some(trap => trap.x === x && trap.y === y);
-    }
-
-    handleDeath() {
-        this.gameOver = true;
-        this.moveDirection = { dx: 0, dy: 0 };
-        if (this.playerMoveTween) {
-            this.playerMoveTween.stop();
-            this.playerMoveTween = null;
-        }
-        this.moving = false;
-        this.drawGame();
-        this.showGameOver();
-
-        // Death sprite
-        if (this.playerSprite) {
-            this.playerSprite.destroy();
-            this.playerSprite = null;
-        }
-        this.playerDieSprite = this.add.sprite(
-            this.playerPosition.x * this.cellSize + this.cellSize / 2,
-            this.playerPosition.y * this.cellSize + this.cellSize / 2,
-            'player_die'
-        );
-        const playerDieScale = calculateSpriteScale('player_die', this.cellSize, this);
-        this.playerDieSprite.setScale(playerDieScale);
-    }
-
-    handleLevelComplete() {
-        this.score += 100;
-        this.level += 1;
-        this.updateScoreAndLevelTexts();
-        if (this.playerMoveTween) {
-            this.playerMoveTween.stop();
-            this.playerMoveTween = null;
-        }
-        this.moving = false;
-        this.requireFreshPressAfterReset = true;
-        this.desiredDirection = { dx: 0, dy: 0 };
-        this.resetGame(false);
-    }
-
-    returnToMenu() {
-        // Clean up
-        if (this.backgroundMusic) {
-            this.backgroundMusic.stop();
-        }
-        // Hide any new record text
-        if (this.newRecordText) {
-            this.newRecordText.setVisible(false);
-        }
-        if (this.menuText) {
-            this.menuText.setVisible(false);
-        }
-        // Transition to menu
-        this.cameras.main.fadeOut(300, 0, 0, 0);
-        this.time.delayedCall(300, () => {
-            this.scene.start('MenuScene');
-        });
-    }
-
-    showGameOver() {
-        // Check and save high score
-        const isNewRecord = ScoreManager.setHighScore(this.score);
-
-        this.gameOverText.setVisible(true);
-        this.restartText.setVisible(true);
-
-        // Show new record message if applicable
-        if (isNewRecord && this.score > 0) {
-            if (!this.newRecordText) {
-                this.newRecordText = this.add.text(CONFIG.GAME_WIDTH / 2, CONFIG.GAME_HEIGHT / 2 - 60, '¡NUEVO RÉCORD!', {
-                    fontSize: '20px',
-                    fontFamily: CONFIG.UI.FONT_FAMILY,
-                    color: '#ffff00',
-                    stroke: '#ff6600',
-                    strokeThickness: 3
-                });
-                this.newRecordText.setOrigin(0.5);
-                this.newRecordText.setDepth(100);
-            }
-            this.newRecordText.setVisible(true);
-
-            // Pulsing animation for new record
-            this.tweens.add({
-                targets: this.newRecordText,
-                scaleX: 1.2,
-                scaleY: 1.2,
-                duration: 400,
-                yoyo: true,
-                repeat: -1
-            });
-        }
-
-        // Show menu instruction
-        if (!this.menuText) {
-            this.menuText = this.add.text(CONFIG.GAME_WIDTH / 2, CONFIG.GAME_HEIGHT / 2 + CONFIG.UI.RESTART_OFFSET_Y + 30, 'PRESIONA M PARA MENÚ', {
-                fontSize: '14px',
-                fontFamily: CONFIG.UI.FONT_FAMILY,
-                color: '#888888'
-            });
-            this.menuText.setOrigin(0.5);
-            this.menuText.setDepth(100);
-        }
-        this.menuText.setVisible(true);
-
-        if (this.playerMoveTween) {
-            this.playerMoveTween.stop();
-            this.playerMoveTween = null;
-        }
-        this.moving = false;
-    }
-
-    resetGame(resetLevel) {
-        if (resetLevel) {
-            this.level = 1;
-            this.score = 0;
-        }
-        this.playerPosition = { x: 0, y: 0 };
-        this.generateRandomExit();
-        this.gameOver = false;
-        this.moveDirection = { dx: 0, dy: 0 };
-        this.desiredDirection = { dx: 0, dy: 0 };
-        this.canUseSave = false;
-
-        if (this.playerMoveTween) {
-            this.playerMoveTween.stop();
-            this.playerMoveTween = null;
-        }
-        this.moving = false;
-
-        this.clearSpriteCache();
-        this.generateMaze();
-        this.initialCoinCount = this.coins.length;
-        this.buildCollisionMap();
-
-        this.gameOverText.setVisible(false);
-        this.restartText.setVisible(false);
-        if (this.newRecordText) {
-            this.newRecordText.setVisible(false);
-        }
-        if (this.menuText) {
-            this.menuText.setVisible(false);
-        }
-
-        this.createGrid();
-
-        // Reset enemies
-        this.enemies.forEach(enemy => {
-            if (enemy && enemy.sprite) {
-                enemy.sprite.destroy();
-            }
-        });
-        this.enemies = [];
-        if (this.level >= 5) {
-            this.initEnemies();
-        }
-
-        if (this.playerDieSprite) {
-            this.playerDieSprite.destroy();
-            this.playerDieSprite = null;
-        }
-        if (this.savePulseTween) {
-            this.savePulseTween.stop();
-            this.savePulseTween = null;
-        }
-        if (this.saveSprite) {
-            this.saveSprite.destroy();
-            this.saveSprite = null;
-        }
-
-        this.drawGame();
-    }
-
-    generateSaveItem() {
-        const excludePositions = [
-            this.playerPosition,
-            this.exitPosition,
-            ...this.obstacles,
-            ...this.traps,
-            ...this.enemies.map(e => ({ x: e.x, y: e.y }))
-        ];
-
-        const position = generateFreePosition(excludePositions, this.boardSize);
-        if (position) {
-            if (this.saves.length === 0) {
-                this.saves.push(position);
-            }
-        }
-    }
-
-    startExitAnimation() {
-        if (!this.exitSprite) return;
-
-        // Stop existing tween if any
-        if (this.exitPulseTween) {
-            this.exitPulseTween.stop();
-        }
-
-        const baseScale = calculateSpriteScale('exit', this.cellSize, this);
-
-        // Smooth pulsing animation with scale, alpha and subtle glow
-        this.exitPulseTween = this.tweens.add({
-            targets: this.exitSprite,
-            scaleX: { from: baseScale * 0.95, to: baseScale * 1.1 },
-            scaleY: { from: baseScale * 0.95, to: baseScale * 1.1 },
-            alpha: { from: 0.7, to: 1.0 },
-            duration: 800,
-            ease: 'Sine.InOut',
-            yoyo: true,
-            repeat: -1
-        });
-    }
-
-    initEnemies() {
-        this.enemies = [];
-        let enemyCount = this.level >= CONFIG.ENEMIES.MIN_LEVEL_FOR_TWO ? CONFIG.ENEMIES.DOUBLE_COUNT : CONFIG.ENEMIES.SINGLE_COUNT;
-
-        for (let i = 0; i < enemyCount; i++) {
-            const excludePositions = [
-                this.playerPosition,
-                this.exitPosition,
-                ...this.obstacles,
-                ...this.traps,
-                ...this.enemies
-            ];
-
-            const position = generateFreePosition(excludePositions, this.boardSize);
-            if (!position) continue;
-
-            const enemyPosition = {
-                x: position.x,
-                y: position.y,
-                direction: this.getRandomDirection(),
-                moving: false,
-                sprite: null
-            };
-
-            enemyPosition.sprite = this.add.sprite(
-                enemyPosition.x * this.cellSize + this.cellSize / 2,
-                enemyPosition.y * this.cellSize + this.cellSize / 2,
-                'enemy'
-            );
-            const enemyScale = calculateSpriteScale('enemy', this.cellSize, this);
-            enemyPosition.sprite.setScale(enemyScale);
-            enemyPosition.sprite.setFlipX(enemyPosition.direction.dx === -1);
-
-            this.enemies.push(enemyPosition);
-        }
-    }
-
-    getRandomDirection() {
-        const directions = [
-            { dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }
-        ];
-        return directions[Phaser.Math.Between(0, directions.length - 1)];
-    }
-
-    updateEnemies() {
-        this.enemies.forEach(enemy => {
-            if (!enemy || !enemy.sprite) return;
-
-            if (!enemy.moving) {
-                enemy.moving = true;
-                let nextX = enemy.x + enemy.direction.dx;
-                let nextY = enemy.y + enemy.direction.dy;
-
-                if (this.isCollisionOptimized(nextX, nextY)) {
-                    enemy.direction = this.getRandomDirection();
-                    enemy.moving = false;
-                    enemy.sprite.setFlipX(enemy.direction.dx === -1);
-                } else {
-                    this.tweens.add({
-                        targets: enemy.sprite,
-                        x: nextX * this.cellSize + this.cellSize / 2,
-                        y: nextY * this.cellSize + this.cellSize / 2,
-                        duration: CONFIG.ENEMIES.MOVE_TWEEN_DURATION_MS,
-                        onComplete: () => {
-                            enemy.x = nextX;
-                            enemy.y = nextY;
-                            enemy.moving = false;
-
-                            if (enemy.x === this.playerPosition.x && enemy.y === this.playerPosition.y) {
-                                this.handleDeath();
-                            }
-                        },
-                        callbackScope: this
-                    });
-                }
-            }
-        });
-    }
-
-    updateScoreAndLevelTexts() {
-        const safeScore = (typeof this.score === 'number' && !isNaN(this.score)) ? this.score : 0;
-        const safeLevel = (typeof this.level === 'number' && !isNaN(this.level)) ? this.level : 1;
-
-        const scoreElement = document.getElementById('score');
-        const levelElement = document.getElementById('level');
-
-        if (scoreElement) scoreElement.textContent = 'Puntos: ' + safeScore;
-        if (levelElement) levelElement.textContent = 'Nivel: ' + safeLevel;
-    }
-
-    shuffleMusicPlaylist() {
-        if (this.availableMusicKeys.length === 0) {
-            this.musicPlaylistOrder = [];
-            this.currentPlaylistIndex = 0;
-            return;
-        }
-        this.musicPlaylistOrder = this.availableMusicKeys.map((_, i) => this.availableMusicKeys[i]);
-        for (let i = this.musicPlaylistOrder.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [this.musicPlaylistOrder[i], this.musicPlaylistOrder[j]] = [this.musicPlaylistOrder[j], this.musicPlaylistOrder[i]];
-        }
-        this.currentPlaylistIndex = 0;
-    }
-
-    playRandomMusic() {
-        if (this.availableMusicKeys.length === 0) return;
-
-        if (this.backgroundMusic) {
-            this.backgroundMusic.stop();
-            this.backgroundMusic.destroy();
-            this.backgroundMusic = null;
-        }
-
-        if (this.currentPlaylistIndex >= this.musicPlaylistOrder.length) {
-            this.shuffleMusicPlaylist();
-        }
-
-        // musicPlaylistOrder now contains the actual music keys (strings), not indices
-        const musicKey = this.musicPlaylistOrder[this.currentPlaylistIndex];
-        this.currentPlaylistIndex++;
-
-        this.playSpecificMusic(musicKey);
-    }
-
-    playSpecificMusic(musicKey) {
-        try {
-            if (!this.cache.audio.exists(musicKey)) return;
-
-            this.backgroundMusic = this.sound.add(musicKey, {
-                loop: false,
-                volume: CONFIG.AUDIO.DEFAULT_VOLUME
-            });
-
-            this.backgroundMusic.play();
-            this.backgroundMusic.once('complete', () => {
-                this.playRandomMusic();
-            });
-
-            // Update UI
-            const toggleMusicButton = document.getElementById('toggle-music');
-            if (toggleMusicButton) toggleMusicButton.textContent = 'Música Off';
-
-        } catch (error) {
-            console.error('Error in playSpecificMusic:', error);
-        }
-    }
-
-    setupTouchControls() {
-        let swipeStartX = 0;
-        let swipeStartY = 0;
-        const minSwipeDistance = 30; // Minimum px to trigger swipe
-
-        this.input.on('pointerdown', (pointer) => {
-            swipeStartX = pointer.x;
-            swipeStartY = pointer.y;
-        });
-
-        this.input.on('pointerup', (pointer) => {
-            if (this.gameOver) return;
-
-            const dx = pointer.x - swipeStartX;
-            const dy = pointer.y - swipeStartY;
-            const absDx = Math.abs(dx);
-            const absDy = Math.abs(dy);
-
-            // Check if swipe is long enough
-            if (Math.max(absDx, absDy) < minSwipeDistance) return;
-
-            // Determine dominant direction
-            if (absDx > absDy) {
-                // Horizontal swipe
-                this.desiredDirection = { dx: dx > 0 ? 1 : -1, dy: 0 };
-            } else {
-                // Vertical swipe
-                this.desiredDirection = { dx: 0, dy: dy > 0 ? 1 : -1 };
-            }
-
-            // Trigger movement
-            if (!this.moving && !this.gameOver) {
-                this.movePlayer(this.desiredDirection.dx, this.desiredDirection.dy);
+    /**
+     * Configura los eventos entre managers
+     */
+    private setupEvents(): void {
+        // Input direction event
+        this.events.on('input:direction', (direction: Direction) => {
+            if (!this.playerController.getIsMoving() &&
+                !this.gameState.isGameOver &&
+                (direction.dx !== 0 || direction.dy !== 0)) {
+                this.handlePlayerMove(direction);
                 this.requireFreshPressAfterReset = false;
             }
         });
+
+        // Player events
+        this.events.on('player:died', () => {
+            this.handleDeath();
+        });
+
+        this.events.on('player:reachedExit', () => {
+            this.handleLevelComplete();
+        });
+
+        // Enemy moved event (check collision with player)
+        this.events.on('enemy:moved', (pos: Position) => {
+            const playerPos = this.playerController.getPosition();
+            if (pos.x === playerPos.x && pos.y === playerPos.y) {
+                this.handleDeath();
+            }
+        });
     }
 
-    setupUIEventListeners() {
-        const toggleMusicButton = document.getElementById('toggle-music');
-        const volumeSlider = document.getElementById('volume-slider');
-        const nextButton = document.getElementById('next-music');
-        const prevButton = document.getElementById('prev-music');
-        const restartButton = document.getElementById('restart-button');
+    /**
+     * Inicia un nuevo juego
+     */
+    private startNewGame(): void {
+        // Generate maze
+        const exitPosition = this.mazeGenerator.generateRandomExit();
+        this.mazeData = this.mazeGenerator.generate(exitPosition);
+        this.saves = [];
 
-        // Cleanup old listeners if any (though we are in a new class instance usually)
-        this.eventListenerCleanup.forEach(({ element, event, handler }) => {
-            if (element) element.removeEventListener(event, handler);
-        });
-        this.eventListenerCleanup = [];
+        // Build collision map
+        this.collision.build(this.mazeData.obstacles);
 
-        const addListener = (element, event, handler) => {
-            if (element) {
-                element.addEventListener(event, handler);
-                this.eventListenerCleanup.push({ element, event, handler });
-            }
-        };
+        // Store initial coin count
+        this.gameState.initialCoinCount = this.mazeData.coins.length;
 
-        addListener(toggleMusicButton, 'click', () => {
-            const soundManager = this.sound as Phaser.Sound.WebAudioSoundManager;
-            if (soundManager && soundManager.context && soundManager.context.state === 'suspended') {
-                soundManager.context.resume().catch(() => { });
-            }
-            if (this.backgroundMusic && this.backgroundMusic.isPlaying) {
-                this.backgroundMusic.pause();
-                if (toggleMusicButton) toggleMusicButton.textContent = 'Música On';
-            } else if (this.backgroundMusic) {
-                this.backgroundMusic.resume();
-                if (toggleMusicButton) toggleMusicButton.textContent = 'Música Off';
-            } else {
-                this.playRandomMusic();
-                if (toggleMusicButton) toggleMusicButton.textContent = 'Música Off';
-            }
+        // Create grid and draw entities
+        this.gridRenderer.createGrid(this.gameState.level);
+        this.gridRenderer.drawEntities({
+            coins: this.mazeData.coins,
+            obstacles: this.mazeData.obstacles,
+            traps: this.mazeData.traps,
+            saves: this.saves,
+            shields: this.shields,
+            exitPosition: this.mazeData.exitPosition
         });
 
-        addListener(volumeSlider, 'input', (e) => {
-            if (this.backgroundMusic) {
-                if (this.backgroundMusic && 'setVolume' in this.backgroundMusic) {
-                    (this.backgroundMusic as any).setVolume(parseFloat(e.target.value));
+        // Create player
+        this.playerController.create(this.playerStartPosition);
+
+        // Initialize enemies (level 5+)
+        const excludePositions = [
+            this.playerStartPosition,
+            this.mazeData.exitPosition,
+            ...this.mazeData.obstacles,
+            ...this.mazeData.traps
+        ];
+        this.enemyManager.init(this.gameState.level, excludePositions);
+
+        // Initialize spiders
+        this.spiderManager.generate(
+            this.gameState.level,
+            this.mazeData.obstacles,
+            this.mazeData.exitPosition
+        );
+    }
+
+    /**
+     * Maneja el movimiento del jugador
+     */
+    private handlePlayerMove(direction: Direction): void {
+        this.playerController.move(
+            direction.dx,
+            direction.dy,
+            this.gameState.level,
+            this.mazeData.traps,
+            this.mazeData.exitPosition,
+            (x, y) => this.enemyManager.checkCollision(x, y) || this.spiderManager.checkCollision(x, y),
+            (x, y) => this.processItemsAtPosition(x, y)
+        );
+    }
+
+    /**
+     * Procesa items en la posición del jugador
+     */
+    private processItemsAtPosition(x: number, y: number): void {
+        // Check coins
+        for (let i = this.mazeData.coins.length - 1; i >= 0; i--) {
+            if (this.mazeData.coins[i].x === x && this.mazeData.coins[i].y === y) {
+                this.playerController.emitCoinParticles(x, y);
+                this.mazeData.coins.splice(i, 1);
+                this.gameState.addScore(10);
+                this.uiManager.updateScore(this.gameState.score);
+                this.gridRenderer.removeCoin(x, y);
+
+                // Check power-up spawn triggers based on coins collected
+                if (this.gameState.initialCoinCount > 0) {
+                    const collected = this.gameState.initialCoinCount - this.mazeData.coins.length;
+                    const ratio = collected / this.gameState.initialCoinCount;
+
+                    // Power-up spawns at configured ratio (only ONE per level)
+                    if (ratio >= CONFIG.POWERUPS.SPAWN_COIN_RATIO && !this.shieldSpawned && !this.continueSpawned) {
+                        // Shield has higher probability than continue
+                        if (Math.random() < CONFIG.POWERUPS.SHIELD_PROBABILITY) {
+                            this.generateShieldItem();
+                            this.shieldSpawned = true;
+                        } else {
+                            this.generateSaveItem();
+                            this.continueSpawned = true;
+                        }
+                    }
                 }
+                break;
             }
+        }
+
+        // Check shield collection
+        if (this.shields.length > 0) {
+            const shield = this.shields[0];
+            if (shield.x === x && shield.y === y) {
+                this.gameState.addShield();
+                this.shields.splice(0, 1);
+                this.gridRenderer.removeShield();
+                this.updatePowerUpsUI();
+            }
+        }
+
+        // Check continue collection
+        if (this.saves.length > 0) {
+            const save = this.saves[0];
+            if (save.x === x && save.y === y) {
+                this.gameState.addContinue();
+                this.saves.splice(0, 1);
+                this.gridRenderer.removeSave();
+                this.updatePowerUpsUI();
+            }
+        }
+
+        // Animate nearby trees
+        this.gridRenderer.animateNearbyTrees(x, y);
+    }
+
+    /**
+     * Genera un save item (continue power-up)
+     */
+    private generateSaveItem(): void {
+        const excludePositions = [
+            this.playerController.getPosition(),
+            this.mazeData.exitPosition,
+            ...this.mazeData.obstacles,
+            ...this.mazeData.traps,
+            ...this.enemyManager.getEnemies().map(e => ({ x: e.x, y: e.y })),
+            ...this.shields
+        ];
+
+        const position = this.mazeGenerator.generateSaveItem(excludePositions);
+        if (position && this.saves.length === 0) {
+            this.saves.push(position);
+            this.gridRenderer.drawEntities({
+                coins: this.mazeData.coins,
+                obstacles: this.mazeData.obstacles,
+                traps: this.mazeData.traps,
+                saves: this.saves,
+                shields: this.shields,
+                exitPosition: this.mazeData.exitPosition
+            });
+        }
+    }
+
+    /**
+     * Genera un shield item
+     */
+    private generateShieldItem(): void {
+        const excludePositions = [
+            this.playerController.getPosition(),
+            this.mazeData.exitPosition,
+            ...this.mazeData.obstacles,
+            ...this.mazeData.traps,
+            ...this.enemyManager.getEnemies().map(e => ({ x: e.x, y: e.y })),
+            ...this.saves
+        ];
+
+        const position = this.mazeGenerator.generateSaveItem(excludePositions);
+        if (position && this.shields.length === 0) {
+            this.shields.push(position);
+            this.gridRenderer.drawEntities({
+                coins: this.mazeData.coins,
+                obstacles: this.mazeData.obstacles,
+                traps: this.mazeData.traps,
+                saves: this.saves,
+                shields: this.shields,
+                exitPosition: this.mazeData.exitPosition
+            });
+        }
+    }
+
+    /**
+     * Maneja la muerte del jugador
+     * Primero intenta usar shield (flash sin detener), luego game over
+     */
+    private handleDeath(): void {
+        // Try to use shield first
+        if (this.gameState.useShield()) {
+            // Shield absorbed the hit - flash player and continue movement
+            this.playerController.flashInvincibility();
+            this.updatePowerUpsUI();
+            return;
+        }
+
+        // No shield - game over
+        this.gameState.isGameOver = true;
+        this.playerController.stopMovement();
+        this.playerController.showDeathSprite();
+        this.gameState.showGameOver();
+    }
+
+    /**
+     * Maneja la completación del nivel
+     */
+    private handleLevelComplete(): void {
+        this.gameState.nextLevel();
+        this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
+        this.playerController.stopMovement();
+        this.requireFreshPressAfterReset = true;
+        this.inputManager.resetDesiredDirection();
+        this.resetGame(false);
+    }
+
+    /**
+     * Resetea el juego
+     */
+    private resetGame(fullReset: boolean): void {
+        // Clear caches
+        this.gridRenderer.clearCache();
+        this.enemyManager.reset();
+        this.spiderManager.reset();
+
+        // Generate new maze
+        const exitPosition = this.mazeGenerator.generateRandomExit();
+        this.mazeData = this.mazeGenerator.generate(exitPosition);
+
+        // Reset power-up items and spawn flags
+        this.saves = [];
+        this.shields = [];
+        this.shieldSpawned = false;
+        this.continueSpawned = false;
+
+        // Rebuild collision
+        this.collision.build(this.mazeData.obstacles);
+        this.gameState.initialCoinCount = this.mazeData.coins.length;
+
+        // Redraw
+        this.gridRenderer.createGrid(this.gameState.level);
+        this.gridRenderer.drawEntities({
+            coins: this.mazeData.coins,
+            obstacles: this.mazeData.obstacles,
+            traps: this.mazeData.traps,
+            saves: this.saves,
+            shields: this.shields,
+            exitPosition: this.mazeData.exitPosition
         });
 
-        addListener(nextButton, 'click', () => {
-            if (this.availableMusicKeys.length > 0) {
-                if (this.currentPlaylistIndex >= this.musicPlaylistOrder.length) {
-                    this.shuffleMusicPlaylist();
-                }
-                this.playRandomMusic();
-            }
-        });
+        // Reset player
+        this.playerController.reset(this.playerStartPosition);
 
-        addListener(prevButton, 'click', () => {
-            if (this.availableMusicKeys.length > 0) {
-                this.currentPlaylistIndex = Math.max(0, this.currentPlaylistIndex - 2);
-                this.playRandomMusic();
-            }
-        });
+        // Re-init enemies
+        const excludePositions = [
+            this.playerStartPosition,
+            this.mazeData.exitPosition,
+            ...this.mazeData.obstacles,
+            ...this.mazeData.traps
+        ];
+        this.enemyManager.init(this.gameState.level, excludePositions);
+        this.spiderManager.generate(
+            this.gameState.level,
+            this.mazeData.obstacles,
+            this.mazeData.exitPosition
+        );
 
-        addListener(restartButton, 'click', () => {
-            if (this.canUseSave) {
-                this.resetGame(false);
-            } else {
-                this.score = 0;
-                this.level = 1;
-                this.updateScoreAndLevelTexts();
-                this.resetGame(true);
-            }
-        });
+        // Hide game over UI
+        this.gameState.hideGameOverUI();
+    }
+
+    /**
+     * Maneja el botón de restart de UI
+     */
+    private handleRestartButton(): void {
+        if (this.gameState.useContinue()) {
+            this.updatePowerUpsUI();
+            this.resetGame(false);
+        } else {
+            this.gameState.reset(true);
+            this.updatePowerUpsUI();
+            this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
+            this.resetGame(true);
+        }
+    }
+
+    /**
+     * Actualiza la UI de power-ups
+     */
+    private updatePowerUpsUI(): void {
+        this.uiManager.updatePowerUps(
+            this.gameState.shieldCount,
+            this.gameState.continueCount
+        );
+    }
+
+
+
+    /**
+     * Retorna al menú principal
+     */
+    private returnToMenu(): void {
+        this.audioManager.stop();
+        this.gameState.returnToMenu();
+    }
+
+    /**
+     * Cleanup al destruir la escena
+     */
+    shutdown(): void {
+        this.inputManager?.destroy();
+        this.audioManager?.destroy();
+        this.playerController?.destroy();
+        this.enemyManager?.destroy();
+        this.spiderManager?.destroy();
+        this.uiManager?.destroy();
+        this.gameState?.destroy();
+        this.gridRenderer?.destroy();
+
+        this.events.off('input:direction');
+        this.events.off('player:died');
+        this.events.off('player:reachedExit');
+        this.events.off('enemy:moved');
     }
 }

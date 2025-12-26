@@ -31,6 +31,23 @@ export interface Enemy extends Position {
 }
 
 /**
+ * Spider enemy state
+ */
+export type SpiderState = 'MOVING' | 'WAITING';
+
+/**
+ * Spider entity
+ */
+export interface Spider extends Position {
+    sprite: Phaser.GameObjects.Sprite | null;
+    pointA: Position;
+    pointB: Position;
+    currentTarget: Position;
+    state: SpiderState;
+    waitStartTime: number;
+}
+
+/**
  * Move calculation result
  */
 export interface MoveResult extends Position {
@@ -98,6 +115,21 @@ export interface GameConfig {
         SINGLE_COUNT: number;
         DOUBLE_COUNT: number;
         MOVE_TWEEN_DURATION_MS: number;
+        FIRST_SPAWN_LEVEL: number;
+        SECOND_ENEMY_INTERVAL: number;
+        MAX_COUNT: number;
+    };
+    SPIDER: {
+        MIN_PATROL_DISTANCE: number;
+        WAIT_DURATION_MS: number;
+        MOVE_SPEED: number;
+        FIRST_SPAWN_LEVEL: number;
+        SECOND_SPAWN_LEVEL: number;
+        THIRD_SPAWN_LEVEL: number;
+    };
+    POWERUPS: {
+        SPAWN_COIN_RATIO: number;
+        SHIELD_PROBABILITY: number;
     };
     PERFORMANCE: {
         INPUT_THROTTLE_MS: number;
@@ -109,10 +141,17 @@ export interface GameConfig {
     DEBUG: boolean;
 }
 
-/**
- * Sprite with grid coordinates
- */
 export interface GridSprite extends Phaser.GameObjects.Sprite {
     gridX?: number;
     gridY?: number;
+}
+
+/**
+ * Sprite de obstáculo con propiedades adicionales
+ */
+export interface ObstacleSprite extends Phaser.GameObjects.Sprite {
+    gridX?: number;
+    gridY?: number;
+    obstacleType?: 'brick' | 'rock' | 'tree';
+    isSwaying?: boolean;
 }

@@ -32,17 +32,6 @@ export function calculateSpriteScale(
 }
 
 /**
- * Valida que las coordenadas estén dentro de los límites del tablero
- * @param x - Coordenada X
- * @param y - Coordenada Y
- * @param boardSize - Tamaño del tablero
- * @returns True si las coordenadas son válidas
- */
-export function isValidPosition(x: number, y: number, boardSize: number): boolean {
-    return x >= 0 && x < boardSize && y >= 0 && y < boardSize;
-}
-
-/**
  * Genera una posición aleatoria libre en el tablero
  * @param excludePositions - Array de posiciones a excluir
  * @param boardSize - Tamaño del tablero
