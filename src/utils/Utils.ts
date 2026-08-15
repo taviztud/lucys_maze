@@ -11,7 +11,8 @@ import type { Position } from '../types/game.types';
 export function calculateSpriteScale(
     textureKey: string,
     targetSize: number,
-    scene: Phaser.Scene
+    scene: Phaser.Scene,
+    frameName?: string | number
 ): number {
     try {
         if (!scene || !scene.textures || !scene.textures.get(textureKey)) {
@@ -20,9 +21,10 @@ export function calculateSpriteScale(
         }
 
         const texture = scene.textures.get(textureKey);
+        const frame = scene.textures.getFrame(textureKey, frameName);
         const sourceImage = texture.getSourceImage() as HTMLImageElement;
-        const originalWidth = sourceImage.width;
-        const originalHeight = sourceImage.height;
+        const originalWidth = frame?.realWidth ?? sourceImage.width;
+        const originalHeight = frame?.realHeight ?? sourceImage.height;
 
         return Math.min(targetSize / originalWidth, targetSize / originalHeight);
     } catch (error) {

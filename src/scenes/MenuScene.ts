@@ -2,6 +2,14 @@ import Phaser from 'phaser';
 import { CONFIG } from '../Config';
 import { ScoreManager } from '../managers/ScoreManager';
 import { musicManager } from '../managers/MusicManager';
+import {
+    calculatePlayerVisualScale,
+    getFirstIdleFrame,
+    PLAYER_IDLE_TEXTURE_KEY,
+    playPlayerIdle,
+    preloadPlayerAnimations,
+    registerPlayerAnimations
+} from '../managers/playerAnimations';
 
 export interface DevModeData {
     enabled: boolean;
@@ -22,19 +30,20 @@ export class MenuScene extends Phaser.Scene {
 
     private devPanel: Phaser.GameObjects.Container | null = null;
     private devTexts: { [key: string]: Phaser.GameObjects.Text } = {};
+    private playerLogo: Phaser.GameObjects.Sprite | null = null;
 
     constructor() {
         super('MenuScene');
     }
 
     preload() {
-        // Load player image for logo
-        this.load.image('player_stand', 'lucy_stand.png');
+        preloadPlayerAnimations(this);
     }
 
     create() {
         const centerX = CONFIG.GAME_WIDTH / 2;
         const centerY = CONFIG.GAME_HEIGHT / 2;
+        registerPlayerAnimations(this);
 
         // Background
         this.cameras.main.setBackgroundColor(CONFIG.UI.MAIN_BACKGROUND_COLOR);
@@ -58,15 +67,27 @@ export class MenuScene extends Phaser.Scene {
         subtitle.setOrigin(0.5);
 
         // Player sprite as logo
-        const playerLogo = this.add.sprite(centerX, centerY + 60, 'player_stand');
-        playerLogo.setScale(3);
+        const playerLogo = this.playerLogo = this.add.sprite(
+            centerX,
+            centerY + 60,
+            PLAYER_IDLE_TEXTURE_KEY,
+            getFirstIdleFrame(this)
+        );
+        const logoScale = calculatePlayerVisualScale(
+            this,
+            PLAYER_IDLE_TEXTURE_KEY,
+            CONFIG.CELL_SIZE * 3,
+            playerLogo.frame.name
+        );
+        playerLogo.setScale(logoScale);
         playerLogo.setOrigin(0.5, 1);  // Origin at feet so animation scales from bottom
+        playPlayerIdle(playerLogo);
 
         // Subtle breathing/idle animation - feet stay grounded
         this.tweens.add({
             targets: playerLogo,
-            scaleY: 3.08,         // Slight vertical stretch (breathing in)
-            scaleX: 2.95,         // Slight horizontal compress
+            scaleY: logoScale * 1.025,
+            scaleX: logoScale * 0.985,
             duration: 1200,
             yoyo: true,
             repeat: -1,
@@ -137,6 +158,24 @@ export class MenuScene extends Phaser.Scene {
             // Only start if not clicking the button
             if (pointer.y < centerY + 50 || pointer.y > centerY + 120) {
                 // Do nothing, let button handle it
+            }
+        });
+    }
+
+    renderGameToText(): string {
+        return JSON.stringify({
+            mode: 'menu',
+            scene: 'MenuScene',
+            player: {
+                visualState: 'idle',
+                frame: this.playerLogo?.frame.name ?? null,
+                animation: this.playerLogo?.anims.currentAnim?.key ?? null
+            },
+            music: {
+                state: musicManager.getState(),
+                track: musicManager.getCurrentTrackId(),
+                format: musicManager.getCurrentFormat(),
+                volume: musicManager.getVolume()
             }
         });
     }

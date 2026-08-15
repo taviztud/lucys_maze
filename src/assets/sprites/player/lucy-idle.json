@@ -1,0 +1,175 @@
+{
+  "frames": {
+    "idle_00": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "sourceSize": {
+        "w": 288,
+        "h": 288
+      }
+    },
+    "idle_01": {
+      "frame": {
+        "x": 288,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "sourceSize": {
+        "w": 288,
+        "h": 288
+      }
+    },
+    "idle_02": {
+      "frame": {
+        "x": 576,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "sourceSize": {
+        "w": 288,
+        "h": 288
+      }
+    },
+    "idle_03": {
+      "frame": {
+        "x": 864,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "sourceSize": {
+        "w": 288,
+        "h": 288
+      }
+    },
+    "idle_04": {
+      "frame": {
+        "x": 0,
+        "y": 288,
+        "w": 288,
+        "h": 288
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "sourceSize": {
+        "w": 288,
+        "h": 288
+      }
+    },
+    "idle_05": {
+      "frame": {
+        "x": 288,
+        "y": 288,
+        "w": 288,
+        "h": 288
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "sourceSize": {
+        "w": 288,
+        "h": 288
+      }
+    },
+    "idle_06": {
+      "frame": {
+        "x": 576,
+        "y": 288,
+        "w": 288,
+        "h": 288
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "sourceSize": {
+        "w": 288,
+        "h": 288
+      }
+    },
+    "idle_07": {
+      "frame": {
+        "x": 864,
+        "y": 288,
+        "w": 288,
+        "h": 288
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 288,
+        "h": 288
+      },
+      "sourceSize": {
+        "w": 288,
+        "h": 288
+      }
+    }
+  },
+  "meta": {
+    "app": "lucys-maze player sprite pipeline",
+    "version": "1.0",
+    "image": "lucy-idle.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1152,
+      "h": 576
+    },
+    "scale": "1"
+  }
+}

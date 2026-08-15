@@ -1,15 +1,18 @@
 {
   "name": "lucys-maze",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Lucy's Maze - Un juego estilo Tomb of the Mask con Phaser 3",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "audio:convert": "node scripts/audio-assets.mjs convert",
     "audio:verify": "node scripts/audio-assets.mjs verify",
-    "prebuild": "npm run audio:verify",
+    "sprites:build": "node scripts/player-sprites.mjs build",
+    "sprites:verify": "node scripts/player-sprites.mjs verify",
+    "assets:verify": "npm run audio:verify && npm run sprites:verify",
+    "prebuild": "npm run assets:verify",
     "build": "tsc && vite build",
-    "prebuild:ihost": "npm run audio:verify",
+    "prebuild:ihost": "npm run assets:verify",
     "build:ihost": "tsc && vite build --base=/apps/lucys_maze/",
     "preview": "vite preview"
   },
@@ -22,6 +25,7 @@
   "license": "MIT",
   "devDependencies": {
     "ffmpeg-static": "5.3.0",
+    "sharp": "0.35.3",
     "typescript": "^5.3.3",
     "vite": "^5.0.10"
   },

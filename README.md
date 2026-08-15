@@ -6,7 +6,7 @@
 
 
 
-![Version](https://img.shields.io/badge/version-0.1.5--alpha-blue)
+![Version](https://img.shields.io/badge/version-0.1.6--alpha-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Phaser](https://img.shields.io/badge/engine-Phaser%203-orange)
 ![TypeScript](https://img.shields.io/badge/language-TypeScript-blue)
@@ -20,12 +20,13 @@
 
 **Lucy's Maze** is a fast-paced arcade game inspired by "Tomb of the Mask". Help Lucy the Chihuahua navigate through intricate mazes, collect coins, avoid traps, and find the exit!
 
-### Features (Alpha 0.1.5)
+### Features (Alpha 0.1.6)
 - **Responsive Gameplay:** Works on Desktop and Mobile devices
 - **Controls:** Keyboard arrows (Desktop) and Swipe gestures (Mobile)
 - **New UI:** Clean bottom control bar for both music and game actions
 - **High Scores:** Local leaderboard system to track your best runs
 - **Retro Aesthetics:** Pixel art style with neon grid effects
+- **Animated Lucy:** Eight-frame idle animation with consistent visual sizing across idle, running, and death states
 - **Progressive Difficulty:** 
   - Phase 1 (1-10): Fast acceleration
   - Phase 2 (11-34): Moderate acceleration
@@ -69,6 +70,20 @@ npm run audio:verify
 
 Use `npm run audio:convert -- --force` only when all Opus files must be regenerated. Production builds run the verification automatically.
 
+### Player Sprite Assets
+
+The editable idle source lives at `src/assets/sprites/player/source/lucy-idle-source.png`. A deterministic pipeline crops its 4×2 frame grid, aligns every pose to the same baseline, and generates the Phaser atlas without resizing or redrawing pixels.
+
+```bash
+# Regenerate the idle atlas after replacing the source sheet
+npm run sprites:build
+
+# Verify frame count, transparency, dimensions, and deterministic output
+npm run sprites:verify
+```
+
+Production builds validate both audio and sprite assets automatically.
+
 ### Controls
 | Action | Desktop | Mobile |
 |--------|---------|--------|
@@ -83,9 +98,9 @@ Use `npm run audio:convert -- --force` only when all Opus files must be regenera
 lucys-maze/
 ├── public/           # Static image assets
 │   └── *.png         # Game sprites
-├── scripts/          # Audio conversion and verification
+├── scripts/          # Reproducible audio and sprite asset pipelines
 ├── src/
-│   ├── assets/audio/ # MP3 and Opus/Ogg background tracks
+│   ├── assets/       # Background audio and generated/source player sprites
 │   ├── scenes/       # GameScene, MenuScene
 │   ├── managers/     # GameState, Input, Music, Enemy, Spider, UI Managers
 │   ├── systems/      # Collision, GridRenderer, MazeGenerator
@@ -105,12 +120,13 @@ lucys-maze/
 
 **Lucy's Maze** es un juego arcade de ritmo rápido inspirado en "Tomb of the Mask". ¡Ayuda a Lucy la Chihuahua a navegar por laberintos intrincados, recolectar monedas, evitar trampas y encontrar la salida!
 
-### Características (Alfa 0.1.5)
+### Características (Alfa 0.1.6)
 - **Jugabilidad Responsiva:** Funciona en PC y dispositivos móviles
 - **Controles:** Flechas del teclado (PC) y gestos de deslizamiento (Móvil)
 - **Nueva UI:** Barra de controles inferior limpia para música y acciones de juego
 - **Récords:** Sistema de puntuación alta local
 - **Estética Retro:** Estilo pixel art con efectos de cuadrícula neón
+- **Lucy animada:** Animación idle de ocho cuadros con tamaño visual consistente al estar quieta, correr y morir
 - **Dificultad Progresiva:** 
   - Fase 1 (1-10): Aceleración rápida
   - Fase 2 (11-34): Aceleración moderada
@@ -154,6 +170,20 @@ npm run audio:verify
 
 Usa `npm run audio:convert -- --force` solamente para regenerar todos los Opus. Los builds de producción ejecutan la validación automáticamente.
 
+### Assets del personaje
+
+La fuente editable del idle está en `src/assets/sprites/player/source/lucy-idle-source.png`. Un pipeline determinista recorta su grilla 4×2, alinea todas las poses a la misma línea de pies y genera el atlas de Phaser sin redimensionar ni redibujar píxeles.
+
+```bash
+# Regenerar el atlas idle después de reemplazar la lámina fuente
+npm run sprites:build
+
+# Verificar cuadros, transparencia, dimensiones y salida determinista
+npm run sprites:verify
+```
+
+Los builds de producción validan automáticamente los assets de audio y del personaje.
+
 ### Controles
 | Acción | PC | Móvil |
 |--------|---------|--------|
@@ -168,9 +198,9 @@ Usa `npm run audio:convert -- --force` solamente para regenerar todos los Opus. 
 lucys-maze/
 ├── public/           # Imágenes estáticas
 │   └── *.png         # Sprites del juego
-├── scripts/          # Conversión y validación de audio
+├── scripts/          # Pipelines reproducibles de audio y sprites
 ├── src/
-│   ├── assets/audio/ # Pistas MP3 y Opus/Ogg
+│   ├── assets/       # Audio de fondo y sprites fuente/generados
 │   ├── scenes/       # GameScene, MenuScene
 │   ├── managers/     # GameState, Input, Music, Enemy, Spider, UI Managers
 │   ├── systems/      # Collision, GridRenderer, MazeGenerator

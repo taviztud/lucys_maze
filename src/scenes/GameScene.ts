@@ -5,6 +5,7 @@ import { CONFIG } from '../Config';
 import { InputManager } from '../managers/InputManager';
 import { musicManager, type MusicPlaybackState } from '../managers/MusicManager';
 import { PlayerController } from '../managers/PlayerController';
+import { preloadPlayerAnimations, registerPlayerAnimations } from '../managers/playerAnimations';
 import { EnemyManager } from '../managers/EnemyManager';
 import { SpiderManager } from '../managers/SpiderManager';
 import { UIManager } from '../managers/UIManager';
@@ -64,7 +65,7 @@ export class GameScene extends Phaser.Scene {
     preload(): void {
         try {
             // Load images
-            this.load.image('player_stand', 'lucy_stand.png');
+            preloadPlayerAnimations(this);
             this.load.image('player_run', 'lucy_run.png');
             this.load.image('player_die', 'lucy_die.png');
             this.load.image('coin', 'coin_tuto.png');
@@ -84,6 +85,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     create(data?: DevModeData): void {
+        registerPlayerAnimations(this);
+
         // Initialize all managers and systems
         this.initializeManagers();
 
@@ -174,7 +177,11 @@ export class GameScene extends Phaser.Scene {
             scene: 'GameScene',
             level: this.gameState.level,
             score: this.gameState.score,
-            player: this.playerController.getPosition(),
+            player: {
+                ...this.playerController.getPosition(),
+                visualState: this.playerController.getVisualState(),
+                frame: this.playerController.getCurrentFrameName()
+            },
             exit: this.mazeData.exitPosition,
             coins: this.mazeData.coins,
             traps: this.mazeData.traps,

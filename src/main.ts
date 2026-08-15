@@ -34,8 +34,12 @@ window.render_game_to_text = (): string => {
         return activeScene.renderGameToText();
     }
 
+    if (activeScene instanceof MenuScene) {
+        return activeScene.renderGameToText();
+    }
+
     return JSON.stringify({
-        mode: activeScene?.scene.key === 'MenuScene' ? 'menu' : 'loading',
+        mode: 'loading',
         scene: activeScene?.scene.key ?? null,
         music: {
             state: musicManager.getState(),

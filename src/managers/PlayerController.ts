@@ -1,8 +1,15 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../Config';
-import { calculateSpriteScale } from '../utils/Utils';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import type { Position, Direction } from '../types/game.types';
+import {
+    calculatePlayerVisualScale,
+    getFirstIdleFrame,
+    PLAYER_IDLE_TEXTURE_KEY,
+    playPlayerIdle
+} from './playerAnimations';
+
+export type PlayerVisualState = 'idle' | 'running' | 'dead';
 
 /**
  * Controlador del jugador con movimiento tipo sliding puzzle
@@ -20,6 +27,7 @@ export class PlayerController {
     // Sprites
     private playerSprite: Phaser.GameObjects.Sprite | null = null;
     private playerDieSprite: Phaser.GameObjects.Sprite | null = null;
+    private visualState: PlayerVisualState = 'idle';
 
     // Particles
     private coinParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
@@ -58,9 +66,11 @@ export class PlayerController {
         this.playerSprite = this.scene.add.sprite(
             position.x * this.cellSize + this.cellSize / 2,
             position.y * this.cellSize + this.cellSize / 2,
-            'player_stand'
+            PLAYER_IDLE_TEXTURE_KEY,
+            getFirstIdleFrame(this.scene)
         );
         this.playerSprite.setDepth(10);
+        this.setVisualState('idle', true);
         this.adjustScaleAndRotation();
 
         // Coin particles
@@ -76,7 +86,7 @@ export class PlayerController {
         // Trail particles
         this.trailParticles = this.scene.add.particles(0, 0, 'player_run', {
             speed: 0,
-            scale: { start: calculateSpriteScale('player_run', this.cellSize, this.scene) * 0.9, end: 0.7 },
+            scale: { start: calculatePlayerVisualScale(this.scene, 'player_run', this.cellSize) * 0.9, end: 0.7 },
             alpha: { start: 0.15, end: 0 },
             lifespan: 1000,
             blendMode: 'ADD',
@@ -340,7 +350,7 @@ export class PlayerController {
         this.isMoving = false;
         this.playerMoveTween = null;
         this.moveDirection = { dx: 0, dy: 0 };
-        this.playerSprite?.setTexture('player_stand');
+        this.setVisualState('idle');
         this.adjustScaleAndRotation();
     }
 
@@ -349,7 +359,7 @@ export class PlayerController {
      */
     private startMovement(): void {
         this.isMoving = true;
-        this.playerSprite?.setTexture('player_run');
+        this.setVisualState('running');
         this.adjustScaleAndRotation();
 
         if (this.trailParticles && this.playerSprite) {
@@ -363,8 +373,22 @@ export class PlayerController {
      */
     private resetMovementState(): void {
         this.moveDirection = { dx: 0, dy: 0 };
-        this.playerSprite?.setTexture('player_stand');
+        this.setVisualState('idle');
         this.adjustScaleAndRotation();
+    }
+
+    private setVisualState(state: PlayerVisualState, force = false): void {
+        if (!this.playerSprite || (!force && this.visualState === state)) return;
+
+        this.visualState = state;
+        this.playerSprite.anims.stop();
+
+        if (state === 'idle') {
+            this.playerSprite.setTexture(PLAYER_IDLE_TEXTURE_KEY, getFirstIdleFrame(this.scene));
+            playPlayerIdle(this.playerSprite);
+        } else if (state === 'running') {
+            this.playerSprite.setTexture('player_run');
+        }
     }
 
     /**
@@ -373,7 +397,12 @@ export class PlayerController {
     private adjustScaleAndRotation(): void {
         if (!this.playerSprite) return;
 
-        const playerScale = calculateSpriteScale(this.playerSprite.texture.key, this.cellSize, this.scene);
+        const playerScale = calculatePlayerVisualScale(
+            this.scene,
+            this.playerSprite.texture.key,
+            this.cellSize,
+            this.playerSprite.frame.name
+        );
         this.playerSprite.setScale(playerScale);
 
         if (this.moveDirection.dx === 1) {
@@ -437,6 +466,7 @@ export class PlayerController {
      * Muestra el sprite de muerte
      */
     showDeathSprite(): void {
+        this.visualState = 'dead';
         if (this.playerSprite) {
             this.playerSprite.destroy();
             this.playerSprite = null;
@@ -447,7 +477,7 @@ export class PlayerController {
             this.playerPosition.y * this.cellSize + this.cellSize / 2,
             'player_die'
         );
-        const dieScale = calculateSpriteScale('player_die', this.cellSize, this.scene);
+        const dieScale = calculatePlayerVisualScale(this.scene, 'player_die', this.cellSize);
         this.playerDieSprite.setScale(dieScale);
     }
 
@@ -487,7 +517,8 @@ export class PlayerController {
             this.playerSprite = this.scene.add.sprite(
                 position.x * this.cellSize + this.cellSize / 2,
                 position.y * this.cellSize + this.cellSize / 2,
-                'player_stand'
+                PLAYER_IDLE_TEXTURE_KEY,
+                getFirstIdleFrame(this.scene)
             );
             this.playerSprite.setDepth(10);
         } else {
@@ -496,9 +527,9 @@ export class PlayerController {
                 position.y * this.cellSize + this.cellSize / 2
             );
             this.playerSprite.setVisible(true);
-            this.playerSprite.setTexture('player_stand');
         }
 
+        this.setVisualState('idle', true);
         this.adjustScaleAndRotation();
     }
 
@@ -521,6 +552,14 @@ export class PlayerController {
      */
     getIsMoving(): boolean {
         return this.isMoving;
+    }
+
+    getVisualState(): PlayerVisualState {
+        return this.visualState;
+    }
+
+    getCurrentFrameName(): string | number | null {
+        return this.playerSprite?.frame.name ?? null;
     }
 
     /**
