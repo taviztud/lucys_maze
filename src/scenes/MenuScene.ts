@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../Config';
 import { ScoreManager } from '../managers/ScoreManager';
+import { musicManager } from '../managers/MusicManager';
 
 export interface DevModeData {
     enabled: boolean;
@@ -259,6 +260,8 @@ export class MenuScene extends Phaser.Scene {
     }
 
     startGame() {
+        // Start from the trusted user gesture. Audio loading never blocks the scene transition.
+        void musicManager.start();
         this.cameras.main.fadeOut(300, 0, 0, 0);
         this.time.delayedCall(300, () => {
             this.scene.start('GameScene', this.devModeData.enabled ? this.devModeData : null);

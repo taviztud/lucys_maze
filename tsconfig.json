@@ -19,12 +19,9 @@
         "noImplicitAny": false,
         "noUnusedLocals": false,
         "noUnusedParameters": false,
-        "typeRoots": [
-            "./node_modules/phaser/types",
-            "./node_modules/@types"
-        ],
         "types": [
-            "phaser"
+            "phaser",
+            "vite/client"
         ]
     },
     "include": [

@@ -19,8 +19,7 @@ export const CONFIG: GameConfig = {
 
     // Configuración de música y audio
     AUDIO: {
-        DEFAULT_VOLUME: 0.5,
-        MAX_BG_TRACKS: 26
+        DEFAULT_VOLUME: 0.5
     },
 
     // UI y efectos visuales

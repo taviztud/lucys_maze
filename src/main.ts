@@ -2,6 +2,13 @@ import Phaser from 'phaser';
 import { CONFIG } from './Config';
 import { MenuScene } from './scenes/MenuScene';
 import { GameScene } from './scenes/GameScene';
+import { musicManager } from './managers/MusicManager';
+
+declare global {
+    interface Window {
+        render_game_to_text: () => string;
+    }
+}
 
 const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
@@ -17,4 +24,24 @@ const config: Phaser.Types.Core.GameConfig = {
     scene: [MenuScene, GameScene]
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+window.render_game_to_text = (): string => {
+    const activeScenes = game.scene.getScenes(true);
+    const activeScene = activeScenes[activeScenes.length - 1];
+
+    if (activeScene instanceof GameScene) {
+        return activeScene.renderGameToText();
+    }
+
+    return JSON.stringify({
+        mode: activeScene?.scene.key === 'MenuScene' ? 'menu' : 'loading',
+        scene: activeScene?.scene.key ?? null,
+        music: {
+            state: musicManager.getState(),
+            track: musicManager.getCurrentTrackId(),
+            format: musicManager.getCurrentFormat(),
+            volume: musicManager.getVolume()
+        }
+    });
+};

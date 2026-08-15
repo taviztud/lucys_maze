@@ -6,7 +6,7 @@
 
 
 
-![Version](https://img.shields.io/badge/version-0.1.4--alpha-blue)
+![Version](https://img.shields.io/badge/version-0.1.5--alpha-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Phaser](https://img.shields.io/badge/engine-Phaser%203-orange)
 ![TypeScript](https://img.shields.io/badge/language-TypeScript-blue)
@@ -20,7 +20,7 @@
 
 **Lucy's Maze** is a fast-paced arcade game inspired by "Tomb of the Mask". Help Lucy the Chihuahua navigate through intricate mazes, collect coins, avoid traps, and find the exit!
 
-### Features (Alpha 0.1.4)
+### Features (Alpha 0.1.5)
 - **Responsive Gameplay:** Works on Desktop and Mobile devices
 - **Controls:** Keyboard arrows (Desktop) and Swipe gestures (Mobile)
 - **New UI:** Clean bottom control bar for both music and game actions
@@ -30,7 +30,7 @@
   - Phase 1 (1-10): Fast acceleration
   - Phase 2 (11-34): Moderate acceleration
   - Phase 3 (35+): Gradual acceleration until max speed at level 54
-- **Background Music:** 26 unique tracks with shuffle playlist system and full controls
+- **Background Music:** 26 streamed tracks, Opus-first with MP3 fallback, shuffle playlist, and full controls
 - **Enemies:** Starting from level 5, enemies patrol the maze
 - **Spiders:** New enemy type that patrols between two points (from level 10)
 - **Developer Mode:** Unlockable menu to set start level, shields, continues, and score
@@ -55,6 +55,20 @@ npm run dev
 npm run build
 ```
 
+### Audio Assets
+
+Background music is discovered automatically from `src/assets/audio/bg`. The game streams one track at a time and never blocks gameplay while music loads.
+
+```bash
+# Convert missing MP3 files to Opus/Ogg (48 kbps)
+npm run audio:convert
+
+# Validate that every track has a valid MP3/Ogg pair
+npm run audio:verify
+```
+
+Use `npm run audio:convert -- --force` only when all Opus files must be regenerated. Production builds run the verification automatically.
+
 ### Controls
 | Action | Desktop | Mobile |
 |--------|---------|--------|
@@ -67,12 +81,13 @@ npm run build
 ### Project Structure
 ```
 lucys-maze/
-├── public/           # Static assets (images, audio)
-│   ├── *.png         # Game sprites
-│   └── sound/bg/     # Background music tracks
+├── public/           # Static image assets
+│   └── *.png         # Game sprites
+├── scripts/          # Audio conversion and verification
 ├── src/
+│   ├── assets/audio/ # MP3 and Opus/Ogg background tracks
 │   ├── scenes/       # GameScene, MenuScene
-│   ├── managers/     # GameState, Input, Audio, Enemy, Spider, UI Managers
+│   ├── managers/     # GameState, Input, Music, Enemy, Spider, UI Managers
 │   ├── systems/      # Collision, GridRenderer, MazeGenerator
 │   ├── types/        # TypeScript type definitions
 │   ├── utils/        # Utility functions
@@ -90,7 +105,7 @@ lucys-maze/
 
 **Lucy's Maze** es un juego arcade de ritmo rápido inspirado en "Tomb of the Mask". ¡Ayuda a Lucy la Chihuahua a navegar por laberintos intrincados, recolectar monedas, evitar trampas y encontrar la salida!
 
-### Características (Alfa 0.1.4)
+### Características (Alfa 0.1.5)
 - **Jugabilidad Responsiva:** Funciona en PC y dispositivos móviles
 - **Controles:** Flechas del teclado (PC) y gestos de deslizamiento (Móvil)
 - **Nueva UI:** Barra de controles inferior limpia para música y acciones de juego
@@ -100,7 +115,7 @@ lucys-maze/
   - Fase 1 (1-10): Aceleración rápida
   - Fase 2 (11-34): Aceleración moderada
   - Fase 3 (35+): Aceleración gradual hasta velocidad máxima en nivel 54
-- **Música de Fondo:** 26 pistas únicas con lista de reproducción aleatoria y controles completos
+- **Música de Fondo:** 26 pistas transmitidas, Opus preferido con respaldo MP3, lista aleatoria y controles completos
 - **Enemigos:** A partir del nivel 5, los enemigos patrullan el laberinto
 - **Arañas:** Nuevo tipo de enemigo que patrulla entre dos puntos (desde nivel 10)
 - **Modo Desarrollador:** Menú desbloqueable para configurar nivel inicial, escudos, continues y puntaje
@@ -125,6 +140,20 @@ npm run dev
 npm run build
 ```
 
+### Assets de audio
+
+La música se descubre automáticamente desde `src/assets/audio/bg`. El juego transmite una sola pista y nunca bloquea la partida mientras carga el audio.
+
+```bash
+# Convertir los MP3 que aún no tengan Opus/Ogg a 48 kbps
+npm run audio:convert
+
+# Validar todos los pares MP3/Ogg
+npm run audio:verify
+```
+
+Usa `npm run audio:convert -- --force` solamente para regenerar todos los Opus. Los builds de producción ejecutan la validación automáticamente.
+
 ### Controles
 | Acción | PC | Móvil |
 |--------|---------|--------|
@@ -137,12 +166,13 @@ npm run build
 ### Estructura del Proyecto
 ```
 lucys-maze/
-├── public/           # Recursos estáticos (imágenes, audio)
-│   ├── *.png         # Sprites del juego
-│   └── sound/bg/     # Pistas de música de fondo
+├── public/           # Imágenes estáticas
+│   └── *.png         # Sprites del juego
+├── scripts/          # Conversión y validación de audio
 ├── src/
+│   ├── assets/audio/ # Pistas MP3 y Opus/Ogg
 │   ├── scenes/       # GameScene, MenuScene
-│   ├── managers/     # GameState, Input, Audio, Enemy, Spider, UI Managers
+│   ├── managers/     # GameState, Input, Music, Enemy, Spider, UI Managers
 │   ├── systems/      # Collision, GridRenderer, MazeGenerator
 │   ├── types/        # Definiciones de tipos TypeScript
 │   ├── utils/        # Funciones utilitarias

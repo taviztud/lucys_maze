@@ -97,7 +97,6 @@ export interface GameConfig {
     };
     AUDIO: {
         DEFAULT_VOLUME: number;
-        MAX_BG_TRACKS: number;
     };
     UI: {
         GAME_OVER_FONT_SIZE: string;

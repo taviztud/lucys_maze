@@ -3,7 +3,7 @@ import { CONFIG } from '../Config';
 
 // Managers
 import { InputManager } from '../managers/InputManager';
-import { AudioManager } from '../managers/AudioManager';
+import { musicManager, type MusicPlaybackState } from '../managers/MusicManager';
 import { PlayerController } from '../managers/PlayerController';
 import { EnemyManager } from '../managers/EnemyManager';
 import { SpiderManager } from '../managers/SpiderManager';
@@ -29,7 +29,6 @@ export class GameScene extends Phaser.Scene {
 
     // Managers
     private inputManager!: InputManager;
-    private audioManager!: AudioManager;
     private playerController!: PlayerController;
     private enemyManager!: EnemyManager;
     private spiderManager!: SpiderManager;
@@ -53,6 +52,7 @@ export class GameScene extends Phaser.Scene {
     private lastEnemyUpdateTime: number = 0;
     private requireFreshPressAfterReset: boolean = false;
     private invincibilityEndTime: number = 0; // Temporal invincibility after shield use
+    private unsubscribeMusicState: (() => void) | null = null;
 
     constructor() {
         super('GameScene');
@@ -78,9 +78,6 @@ export class GameScene extends Phaser.Scene {
             this.load.image('power_continue', 'power_continue.png');
             this.load.image('power_shield', 'power_shield.png');
 
-            // Initialize audio manager early for preload
-            this.audioManager = new AudioManager(this);
-            this.audioManager.detectAndLoadMusic();
         } catch (error) {
             console.error('Critical error in preload:', error);
         }
@@ -101,28 +98,27 @@ export class GameScene extends Phaser.Scene {
         // Generate initial maze
         this.startNewGame();
 
-        // Initialize audio
-        this.audioManager.initMusic();
-
         // Setup UI event listeners
         this.uiManager.setupEventListeners({
             onMusicToggle: () => {
-                this.audioManager.togglePlayPause();
-                this.uiManager.updateMusicButtonState(this.audioManager.isPlaying());
+                void musicManager.togglePlayPause();
             },
             onMusicStop: () => {
-                this.audioManager.stop();
-                this.uiManager.updateMusicButtonState(false);
+                musicManager.stop();
             },
-            onVolumeChange: (vol) => this.audioManager.setVolume(vol),
+            onVolumeChange: (vol) => musicManager.setVolume(vol),
             onNextMusic: () => {
-                this.audioManager.playNext();
-                this.uiManager.updateMusicButtonState(this.audioManager.isPlaying());
+                void musicManager.playNext();
             },
             onMenu: () => this.returnToMenu(),
             onContinue: () => this.handleContinueButton(),
             onRestart: () => this.handleRestartButton()
         });
+
+        this.unsubscribeMusicState = musicManager.subscribe((state: MusicPlaybackState) => {
+            this.uiManager.updateMusicButtonState(state === 'loading' || state === 'playing');
+        });
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupMusicIntegration, this);
 
         // Update initial UI
         this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
@@ -166,6 +162,31 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
+    /** Concise state used by the automated browser test loop. */
+    renderGameToText(): string {
+        if (!this.gameState || !this.playerController || !this.mazeData) {
+            return JSON.stringify({ mode: 'loading', scene: 'GameScene' });
+        }
+
+        return JSON.stringify({
+            coordinateSystem: 'grid origin top-left; x increases right; y increases down',
+            mode: this.gameState.isGameOver ? 'game-over' : 'playing',
+            scene: 'GameScene',
+            level: this.gameState.level,
+            score: this.gameState.score,
+            player: this.playerController.getPosition(),
+            exit: this.mazeData.exitPosition,
+            coins: this.mazeData.coins,
+            traps: this.mazeData.traps,
+            music: {
+                state: musicManager.getState(),
+                track: musicManager.getCurrentTrackId(),
+                format: musicManager.getCurrentFormat(),
+                volume: musicManager.getVolume()
+            }
+        });
+    }
+
     /**
      * Inicializa todos los managers y sistemas
      */
@@ -177,7 +198,6 @@ export class GameScene extends Phaser.Scene {
 
         // Managers
         this.inputManager = new InputManager(this);
-        // audioManager already initialized in preload
         this.playerController = new PlayerController(this, this.collision, this.cellSize);
         this.enemyManager = new EnemyManager(this, this.collision, this.cellSize);
         this.spiderManager = new SpiderManager(this, this.collision, this.cellSize, this.boardWidth, this.boardHeight);
@@ -538,8 +558,14 @@ export class GameScene extends Phaser.Scene {
      * Retorna al menú principal
      */
     private returnToMenu(): void {
-        this.audioManager.stop();
+        musicManager.stop();
         this.gameState.returnToMenu();
+    }
+
+    private cleanupMusicIntegration(): void {
+        this.unsubscribeMusicState?.();
+        this.unsubscribeMusicState = null;
+        musicManager.stop();
     }
 
     /**
@@ -547,7 +573,6 @@ export class GameScene extends Phaser.Scene {
      */
     shutdown(): void {
         this.inputManager?.destroy();
-        this.audioManager?.destroy();
         this.playerController?.destroy();
         this.enemyManager?.destroy();
         this.spiderManager?.destroy();
