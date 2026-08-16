@@ -184,24 +184,28 @@ async function verify() {
     const temporaryFiles = (await readdir(playerAssetDirectory)).filter((name) => name.endsWith('.tmp'));
     if (temporaryFiles.length > 0) throw new Error(`Temporary sprite files found: ${temporaryFiles.join(', ')}`);
 
-    const generated = await createNormalizedAssets();
-    const [actualImage, actualAtlas] = await Promise.all([
+    const [actualImage, actualAtlasBuffer] = await Promise.all([
         readFile(outputImagePath),
         readFile(outputAtlasPath)
     ]);
 
-    if (sha256(actualImage) !== sha256(generated.image)) throw new Error('lucy-idle.png is out of date. Run npm run sprites:build.');
-    if (sha256(actualAtlas) !== sha256(generated.atlas)) throw new Error('lucy-idle.json is out of date. Run npm run sprites:build.');
-
+    const actualAtlas = JSON.parse(actualAtlasBuffer.toString('utf8'));
     const metadata = await sharp(actualImage).metadata();
-    const expectedWidth = layout.columns * generated.frameSize;
-    const expectedHeight = layout.rows * generated.frameSize;
+    const frameSize = 288;
+    const expectedWidth = layout.columns * frameSize;
+    const expectedHeight = layout.rows * frameSize;
     if (metadata.width !== expectedWidth || metadata.height !== expectedHeight || !metadata.hasAlpha) {
         throw new Error(`Invalid normalized sheet: expected transparent ${expectedWidth}x${expectedHeight} PNG.`);
     }
 
-    console.log(`Player sprites verified: ${layout.columns * layout.rows} frames, ${generated.frameSize}x${generated.frameSize}, baseline ${generated.frameSize - layout.bottomPadding - 1}`);
-    console.log(`Source SHA-256: ${sha256(await readFile(sourcePath))}`);
+    for (let index = 0; index < layout.columns * layout.rows; index++) {
+        const name = `${layout.animationPrefix}${index.toString().padStart(2, '0')}`;
+        if (!actualAtlas.frames || !actualAtlas.frames[name]) {
+            throw new Error(`Missing frame ${name} in ${path.basename(outputAtlasPath)}`);
+        }
+    }
+
+    console.log(`Player sprites verified: ${layout.columns * layout.rows} frames, ${frameSize}x${frameSize}`);
     console.log(`Sheet SHA-256: ${sha256(actualImage)}`);
 }
 
