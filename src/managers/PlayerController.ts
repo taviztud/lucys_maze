@@ -83,16 +83,23 @@ export class PlayerController {
             emitting: false
         });
 
-        // Trail particles
+        // Trail particles. Keep both scale axes independent so mirroring the
+        // horizontal axis never flips the particle vertically as well.
+        const trailScale = {
+            start: calculatePlayerVisualScale(this.scene, 'player_run', this.cellSize) * 0.9,
+            end: 0.7
+        };
         this.trailParticles = this.scene.add.particles(0, 0, 'player_run', {
             speed: 0,
-            scale: { start: calculatePlayerVisualScale(this.scene, 'player_run', this.cellSize) * 0.9, end: 0.7 },
+            scaleX: { ...trailScale },
+            scaleY: { ...trailScale },
             alpha: { start: 0.15, end: 0 },
             lifespan: 1000,
             blendMode: 'ADD',
             frequency: 140,
             emitting: false
         });
+        this.trailParticles.onParticleEmit((particle) => this.applyTrailParticleOrientation(particle));
     }
 
     /**
@@ -405,23 +412,38 @@ export class PlayerController {
         );
         this.playerSprite.setScale(playerScale);
 
-        if (this.moveDirection.dx === 1) {
-            this.playerSprite.setAngle(0);
-            this.playerSprite.setFlipX(false);
-        } else if (this.moveDirection.dx === -1) {
-            this.playerSprite.setAngle(0);
-            this.playerSprite.setFlipX(true);
-        } else if (this.moveDirection.dy === -1) {
-            this.playerSprite.setAngle(-90);
-            this.playerSprite.setFlipX(false);
-        } else if (this.moveDirection.dy === 1) {
-            this.playerSprite.setAngle(90);
-            this.playerSprite.setFlipX(false);
-        } else {
-            // Default orientation (facing right)
-            this.playerSprite.setAngle(0);
-            this.playerSprite.setFlipX(false);
+        const orientation = this.getMovementVisualOrientation();
+        this.playerSprite.setAngle(orientation.angle);
+        this.playerSprite.setFlipX(orientation.flipX);
+    }
+
+    private applyTrailParticleOrientation(particle: Phaser.GameObjects.Particles.Particle): void {
+        const orientation = this.getMovementVisualOrientation();
+        const horizontalSign = orientation.flipX ? -1 : 1;
+        const scaleXData = particle.data.scaleX;
+        const scaleYData = particle.data.scaleY;
+
+        particle.angle = orientation.angle;
+        particle.rotation = Phaser.Math.DegToRad(orientation.angle);
+        particle.scaleX = Math.abs(particle.scaleX) * horizontalSign;
+        particle.scaleY = Math.abs(particle.scaleY);
+
+        if (scaleXData) {
+            scaleXData.min = Math.abs(scaleXData.min) * horizontalSign;
+            scaleXData.max = Math.abs(scaleXData.max) * horizontalSign;
         }
+
+        if (scaleYData) {
+            scaleYData.min = Math.abs(scaleYData.min);
+            scaleYData.max = Math.abs(scaleYData.max);
+        }
+    }
+
+    private getMovementVisualOrientation(): { angle: number; flipX: boolean } {
+        if (this.moveDirection.dx < 0) return { angle: 0, flipX: true };
+        if (this.moveDirection.dy < 0) return { angle: -90, flipX: false };
+        if (this.moveDirection.dy > 0) return { angle: 90, flipX: false };
+        return { angle: 0, flipX: false };
     }
 
     /**
@@ -466,6 +488,9 @@ export class PlayerController {
      * Muestra el sprite de muerte
      */
     showDeathSprite(): void {
+        if (this.playerDieSprite?.active) return;
+
+        this.destroyDeathSprite();
         this.visualState = 'dead';
         if (this.playerSprite) {
             this.playerSprite.destroy();
@@ -507,10 +532,9 @@ export class PlayerController {
             this.playerMoveTween = null;
         }
 
-        if (this.playerDieSprite) {
-            this.playerDieSprite.destroy();
-            this.playerDieSprite = null;
-        }
+        this.trailParticles?.stop();
+        this.trailParticles?.killAll();
+        this.destroyDeathSprite();
 
         // Recreate player sprite if needed
         if (!this.playerSprite) {
@@ -562,6 +586,32 @@ export class PlayerController {
         return this.playerSprite?.frame.name ?? null;
     }
 
+    getTrailState(): {
+        emitting: boolean;
+        alive: number;
+        orientations: Array<{ angle: number; flipX: boolean; flipY: boolean }>;
+    } {
+        const orientations = new Map<string, { angle: number; flipX: boolean; flipY: boolean }>();
+
+        this.trailParticles?.forEachAlive((particle) => {
+            const orientation = {
+                angle: Math.round(particle.angle),
+                flipX: particle.scaleX < 0,
+                flipY: particle.scaleY < 0
+            };
+            orientations.set(
+                `${orientation.angle}:${orientation.flipX}:${orientation.flipY}`,
+                orientation
+            );
+        }, this);
+
+        return {
+            emitting: this.trailParticles?.emitting ?? false,
+            alive: this.trailParticles?.getAliveParticleCount() ?? 0,
+            orientations: [...orientations.values()]
+        };
+    }
+
     /**
      * Obtiene el sprite del jugador
      */
@@ -575,8 +625,13 @@ export class PlayerController {
     destroy(): void {
         this.stopMovement();
         if (this.playerSprite) this.playerSprite.destroy();
-        if (this.playerDieSprite) this.playerDieSprite.destroy();
+        this.destroyDeathSprite();
         if (this.coinParticles) this.coinParticles.destroy();
         if (this.trailParticles) this.trailParticles.destroy();
+    }
+
+    private destroyDeathSprite(): void {
+        this.playerDieSprite?.destroy();
+        this.playerDieSprite = null;
     }
 }

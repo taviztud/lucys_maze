@@ -180,7 +180,8 @@ export class GameScene extends Phaser.Scene {
             player: {
                 ...this.playerController.getPosition(),
                 visualState: this.playerController.getVisualState(),
-                frame: this.playerController.getCurrentFrameName()
+                frame: this.playerController.getCurrentFrameName(),
+                trail: this.playerController.getTrailState()
             },
             exit: this.mazeData.exitPosition,
             coins: this.mazeData.coins,
@@ -437,6 +438,11 @@ export class GameScene extends Phaser.Scene {
      * Verifica invincibilidad para evitar consumo múltiple de shields
      */
     private handleDeath(): void {
+        // Multiple collision sources can report the same fatal hit in one frame.
+        // Once game over is active, ignore duplicate notifications so only one
+        // death sprite is created and tracked for the next reset.
+        if (this.gameState.isGameOver) return;
+
         const currentTime = this.time.now;
 
         // Skip if currently invincible (shield was just used)

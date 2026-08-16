@@ -2,6 +2,7 @@
   "name": "lucys-maze",
   "version": "0.1.6",
   "description": "Lucy's Maze - Un juego estilo Tomb of the Mask con Phaser 3",
+  "author": "Gustavo Astudillo P.",
   "type": "module",
   "scripts": {
     "dev": "vite",

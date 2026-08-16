@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import packageMetadata from '../../package.json';
 import { CONFIG } from '../Config';
 import { ScoreManager } from '../managers/ScoreManager';
 import { musicManager } from '../managers/MusicManager';
@@ -10,6 +11,11 @@ import {
     preloadPlayerAnimations,
     registerPlayerAnimations
 } from '../managers/playerAnimations';
+
+const GAME_INFO = {
+    version: packageMetadata.version,
+    credits: `Desarrollado por ${packageMetadata.author}`
+} as const;
 
 export interface DevModeData {
     enabled: boolean;
@@ -135,6 +141,21 @@ export class MenuScene extends Phaser.Scene {
         });
         instructions.setOrigin(0.5);
 
+        // Version and credits share the package metadata as their single source of truth.
+        const gameInfo = this.add.text(
+            centerX,
+            centerY + 265,
+            `VERSIÓN ${GAME_INFO.version}\n${GAME_INFO.credits.toUpperCase()}`,
+            {
+                fontSize: '9px',
+                fontFamily: CONFIG.UI.FONT_FAMILY,
+                color: '#7a7a8c',
+                align: 'center',
+                lineSpacing: 6
+            }
+        );
+        gameInfo.setOrigin(0.5);
+
         // Dev Mode button (small, in corner)
         const devButton = this.add.text(CONFIG.GAME_WIDTH - 10, 10, 'DEV', {
             fontSize: '12px',
@@ -171,6 +192,7 @@ export class MenuScene extends Phaser.Scene {
                 frame: this.playerLogo?.frame.name ?? null,
                 animation: this.playerLogo?.anims.currentAnim?.key ?? null
             },
+            info: GAME_INFO,
             music: {
                 state: musicManager.getState(),
                 track: musicManager.getCurrentTrackId(),
