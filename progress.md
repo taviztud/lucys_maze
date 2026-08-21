@@ -40,4 +40,4 @@ Original prompt: Corregir localmente que el cadáver de Lucy permanezca visible 
 - `npm ci`, `assets:verify`, TypeScript, builds normal/iHost y `git diff --check` pasan. El proyecto no define scripts separados de lint o tests.
 - Cliente Playwright oficial y navegador confirman ciclos, movimiento/orientación de Worm, posición estática de Lelar, restart/cambio de nivel y convivencia con la araña; el juego no registra errores de consola ni 404 de los atlas.
 - Studio auto-detecta correctamente las dos láminas (8x1) y permite previsualizarlas. Su página conserva un 404 preexistente y ajeno para `/favicon.ico`.
-- Pendiente únicamente confirmar y publicar en iHost desde el SHA limpio autorizado por la solicitud actual.
+- Commit confirmado en `ihost/main` y publicación iHost completada desde un checkout limpio; navegador, dashboard y FileBrowser validan la versión activa.
