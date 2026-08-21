@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../Config';
-import { calculateSpriteScale, generateFreePosition } from '../utils/Utils';
+import { generateFreePosition } from '../utils/Utils';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import type { Position, Direction, Enemy } from '../types/game.types';
+import { createAnimatedEnemySprite } from './enemyAnimations';
 
 /**
  * Gestor de enemigos regulares con movimiento aleatorio
@@ -56,14 +57,14 @@ export class EnemyManager {
                 sprite: null
             };
 
-            enemy.sprite = this.scene.add.sprite(
+            enemy.sprite = createAnimatedEnemySprite(
+                this.scene,
                 enemy.x * this.cellSize + this.cellSize / 2,
                 enemy.y * this.cellSize + this.cellSize / 2,
-                'enemy'
+                'worm',
+                this.cellSize
             );
 
-            const enemyScale = calculateSpriteScale('enemy', this.cellSize, this.scene);
-            enemy.sprite.setScale(enemyScale);
             enemy.sprite.setFlipX(enemy.direction.dx === -1);
 
             this.enemies.push(enemy);

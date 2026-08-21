@@ -11,6 +11,10 @@
 ![Phaser](https://img.shields.io/badge/engine-Phaser%203-orange)
 ![TypeScript](https://img.shields.io/badge/language-TypeScript-blue)
 
+## Technical documentation / Documentación técnica
+
+- [Sprite and animation architecture / Arquitectura de sprites y animaciones](docs/sprites-and-animations.md)
+
 [English](#english) | [Español](#español)
 
 ---

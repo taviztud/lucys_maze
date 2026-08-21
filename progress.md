@@ -25,3 +25,19 @@ Original prompt: Corregir localmente que el cadáver de Lucy permanezca visible 
 - El cliente oficial de `develop-web-game` confirma estados de menu y gameplay; sus capturas de canvas quedan negras aun en modo headed por la combinacion WebGL/captura, por lo que la inspeccion visual se completo con capturas de pagina Playwright reales. Consola sin errores.
 
 - No hacer commit ni despliegue sin indicación explícita del usuario.
+
+## Integración Worm y Lelar
+
+- Solicitud actual: integrar `worm_walk` en el enemigo móvil y sustituir visualmente la trampa giratoria por Lelar usando `lelar_idle`, sin cambiar mecánicas.
+- Los cuatro assets de Studio quedaron centralizados en `src/assets/sprites/enemies/` sin copias en la raíz.
+- La carga, el registro, la reproducción y la escala de ambas animaciones usan un módulo compartido y leen cuadros/FPS/repetición/yoyo desde los JSON de Studio.
+- `EnemyManager` conserva el movimiento y `flipX` del enemigo anterior; `GridRenderer` conserva posiciones y colisión de las trampas, pero Lelar ya no recibe tweens de rotación.
+- TypeScript pasa y el primer smoke test del cliente oficial muestra tres Lelars estáticos con `lelar_idle:idle`, frame avanzado e `isPlaying: true`.
+
+## TODO Worm y Lelar
+
+- Implementación y documentación completadas. Los atlas tienen ocho frames contiguos y válidos; Worm usa 3 FPS en bucle y Lelar 1 FPS con bucle/yoyo según Studio.
+- `npm ci`, `assets:verify`, TypeScript, builds normal/iHost y `git diff --check` pasan. El proyecto no define scripts separados de lint o tests.
+- Cliente Playwright oficial y navegador confirman ciclos, movimiento/orientación de Worm, posición estática de Lelar, restart/cambio de nivel y convivencia con la araña; el juego no registra errores de consola ni 404 de los atlas.
+- Studio auto-detecta correctamente las dos láminas (8x1) y permite previsualizarlas. Su página conserva un 404 preexistente y ajeno para `/favicon.ico`.
+- Pendiente únicamente confirmar y publicar en iHost desde el SHA limpio autorizado por la solicitud actual.

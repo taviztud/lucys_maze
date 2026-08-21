@@ -1,0 +1,250 @@
+{
+  "frames": {
+    "frame_00": {
+      "frame": {
+        "x": 0,
+        "y": 225,
+        "w": 275,
+        "h": 239
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 275,
+        "h": 239
+      },
+      "sourceSize": {
+        "w": 275,
+        "h": 239
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_01": {
+      "frame": {
+        "x": 275,
+        "y": 225,
+        "w": 275,
+        "h": 239
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 275,
+        "h": 239
+      },
+      "sourceSize": {
+        "w": 275,
+        "h": 239
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_02": {
+      "frame": {
+        "x": 550,
+        "y": 225,
+        "w": 275,
+        "h": 239
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 275,
+        "h": 239
+      },
+      "sourceSize": {
+        "w": 275,
+        "h": 239
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_03": {
+      "frame": {
+        "x": 825,
+        "y": 225,
+        "w": 275,
+        "h": 239
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 275,
+        "h": 239
+      },
+      "sourceSize": {
+        "w": 275,
+        "h": 239
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_04": {
+      "frame": {
+        "x": 1100,
+        "y": 225,
+        "w": 275,
+        "h": 239
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 275,
+        "h": 239
+      },
+      "sourceSize": {
+        "w": 275,
+        "h": 239
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_05": {
+      "frame": {
+        "x": 1375,
+        "y": 225,
+        "w": 275,
+        "h": 239
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 275,
+        "h": 239
+      },
+      "sourceSize": {
+        "w": 275,
+        "h": 239
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_06": {
+      "frame": {
+        "x": 1650,
+        "y": 225,
+        "w": 275,
+        "h": 239
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 275,
+        "h": 239
+      },
+      "sourceSize": {
+        "w": 275,
+        "h": 239
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_07": {
+      "frame": {
+        "x": 1925,
+        "y": 225,
+        "w": 275,
+        "h": 239
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 275,
+        "h": 239
+      },
+      "sourceSize": {
+        "w": 275,
+        "h": 239
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    }
+  },
+  "meta": {
+    "app": "lucys-maze sprite studio",
+    "version": "1.0",
+    "image": "worm_walk.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2200,
+      "h": 724
+    },
+    "scale": "1"
+  },
+  "anims": [
+    {
+      "key": "worm_walk:idle",
+      "type": "frame",
+      "frames": [
+        {
+          "key": "worm_walk",
+          "frame": "frame_00"
+        },
+        {
+          "key": "worm_walk",
+          "frame": "frame_01"
+        },
+        {
+          "key": "worm_walk",
+          "frame": "frame_02"
+        },
+        {
+          "key": "worm_walk",
+          "frame": "frame_03"
+        },
+        {
+          "key": "worm_walk",
+          "frame": "frame_04"
+        },
+        {
+          "key": "worm_walk",
+          "frame": "frame_05"
+        },
+        {
+          "key": "worm_walk",
+          "frame": "frame_06"
+        },
+        {
+          "key": "worm_walk",
+          "frame": "frame_07"
+        }
+      ],
+      "frameRate": 3,
+      "repeat": -1,
+      "yoyo": false
+    }
+  ]
+}

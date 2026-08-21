@@ -1,0 +1,250 @@
+{
+  "frames": {
+    "frame_00": {
+      "frame": {
+        "x": 0,
+        "y": 231,
+        "w": 272,
+        "h": 237
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 272,
+        "h": 237
+      },
+      "sourceSize": {
+        "w": 272,
+        "h": 237
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_01": {
+      "frame": {
+        "x": 272,
+        "y": 231,
+        "w": 272,
+        "h": 237
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 272,
+        "h": 237
+      },
+      "sourceSize": {
+        "w": 272,
+        "h": 237
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_02": {
+      "frame": {
+        "x": 544,
+        "y": 231,
+        "w": 272,
+        "h": 237
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 272,
+        "h": 237
+      },
+      "sourceSize": {
+        "w": 272,
+        "h": 237
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_03": {
+      "frame": {
+        "x": 816,
+        "y": 231,
+        "w": 272,
+        "h": 237
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 272,
+        "h": 237
+      },
+      "sourceSize": {
+        "w": 272,
+        "h": 237
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_04": {
+      "frame": {
+        "x": 1088,
+        "y": 231,
+        "w": 272,
+        "h": 237
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 272,
+        "h": 237
+      },
+      "sourceSize": {
+        "w": 272,
+        "h": 237
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_05": {
+      "frame": {
+        "x": 1360,
+        "y": 231,
+        "w": 272,
+        "h": 237
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 272,
+        "h": 237
+      },
+      "sourceSize": {
+        "w": 272,
+        "h": 237
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_06": {
+      "frame": {
+        "x": 1632,
+        "y": 231,
+        "w": 272,
+        "h": 237
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 272,
+        "h": 237
+      },
+      "sourceSize": {
+        "w": 272,
+        "h": 237
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "frame_07": {
+      "frame": {
+        "x": 1904,
+        "y": 231,
+        "w": 272,
+        "h": 237
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 272,
+        "h": 237
+      },
+      "sourceSize": {
+        "w": 272,
+        "h": 237
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    }
+  },
+  "meta": {
+    "app": "lucys-maze sprite studio",
+    "version": "1.0",
+    "image": "lelar_idle.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2176,
+      "h": 724
+    },
+    "scale": "1"
+  },
+  "anims": [
+    {
+      "key": "lelar_idle:idle",
+      "type": "frame",
+      "frames": [
+        {
+          "key": "lelar_idle",
+          "frame": "frame_00"
+        },
+        {
+          "key": "lelar_idle",
+          "frame": "frame_01"
+        },
+        {
+          "key": "lelar_idle",
+          "frame": "frame_02"
+        },
+        {
+          "key": "lelar_idle",
+          "frame": "frame_03"
+        },
+        {
+          "key": "lelar_idle",
+          "frame": "frame_04"
+        },
+        {
+          "key": "lelar_idle",
+          "frame": "frame_05"
+        },
+        {
+          "key": "lelar_idle",
+          "frame": "frame_06"
+        },
+        {
+          "key": "lelar_idle",
+          "frame": "frame_07"
+        }
+      ],
+      "frameRate": 1,
+      "repeat": -1,
+      "yoyo": true
+    }
+  ]
+}

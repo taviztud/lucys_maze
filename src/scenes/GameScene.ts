@@ -6,6 +6,7 @@ import { InputManager } from '../managers/InputManager';
 import { musicManager, type MusicPlaybackState } from '../managers/MusicManager';
 import { PlayerController } from '../managers/PlayerController';
 import { preloadPlayerAnimations, registerPlayerAnimations } from '../managers/playerAnimations';
+import { preloadEnemyAnimations, registerEnemyAnimations } from '../managers/enemyAnimations';
 import { EnemyManager } from '../managers/EnemyManager';
 import { SpiderManager } from '../managers/SpiderManager';
 import { UIManager } from '../managers/UIManager';
@@ -66,15 +67,14 @@ export class GameScene extends Phaser.Scene {
         try {
             // Load images
             preloadPlayerAnimations(this);
+            preloadEnemyAnimations(this);
             this.load.image('player_run', 'lucy_run.png');
             this.load.image('player_die', 'lucy_die.png');
             this.load.image('coin', 'coin_tuto.png');
             this.load.image('obstacle_brick', 'brick_1.png');
             this.load.image('obstacle_rock', 'rock_1.png');
             this.load.image('obstacle_tree', 'tree_1.png');
-            this.load.image('trap', 'sping.png');
             this.load.image('exit', 'exit.png');
-            this.load.image('enemy', 'enemy.png');
             this.load.image('spider', 'enemy_spider.png');
             this.load.image('power_continue', 'power_continue.png');
             this.load.image('power_shield', 'power_shield.png');
@@ -86,6 +86,7 @@ export class GameScene extends Phaser.Scene {
 
     create(data?: DevModeData): void {
         registerPlayerAnimations(this);
+        registerEnemyAnimations(this);
 
         // Initialize all managers and systems
         this.initializeManagers();
@@ -186,6 +187,15 @@ export class GameScene extends Phaser.Scene {
             exit: this.mazeData.exitPosition,
             coins: this.mazeData.coins,
             traps: this.mazeData.traps,
+            worms: this.enemyManager.getEnemies().map((enemy) => ({
+                x: enemy.x,
+                y: enemy.y,
+                frame: enemy.sprite?.frame.name ?? null,
+                animation: enemy.sprite?.anims.currentAnim?.key ?? null,
+                isPlaying: enemy.sprite?.anims.isPlaying ?? false,
+                flipX: enemy.sprite?.flipX ?? false
+            })),
+            lelars: this.gridRenderer.getLelarVisualStates(),
             music: {
                 state: musicManager.getState(),
                 track: musicManager.getCurrentTrackId(),

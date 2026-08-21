@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../Config';
 import { calculateSpriteScale } from '../utils/Utils';
+import { configureAnimatedEnemySprite, createAnimatedEnemySprite } from '../managers/enemyAnimations';
 import type { Position, Obstacle, SpriteCache, GridSprite, ObstacleSprite } from '../types/game.types';
 
 /**
@@ -29,7 +30,7 @@ export class GridRenderer {
     // Entity sprites
     private coinSprites: GridSprite[] = [];
     private obstacleSprites: ObstacleSprite[] = [];
-    private trapSprites: Phaser.GameObjects.Sprite[] = [];
+    private trapSprites: GridSprite[] = [];
     private exitSprite: Phaser.GameObjects.Sprite | null = null;
     private saveSprite: Phaser.GameObjects.Sprite | null = null;
     private shieldSprite: Phaser.GameObjects.Sprite | null = null;
@@ -214,49 +215,51 @@ export class GridRenderer {
         });
     }
 
-    /**
-     * Dibuja las trampas con animación de giro
-     */
+    /** Dibuja a Lelar en las posiciones peligrosas del laberinto. */
     private drawTraps(traps: Position[]): void {
         this.trapSprites = [];
         traps.forEach((trap, index) => {
-            let trapSprite: Phaser.GameObjects.Sprite;
+            let trapSprite: GridSprite;
 
             if (this.spriteCache.traps[index]?.active) {
-                trapSprite = this.spriteCache.traps[index];
+                trapSprite = this.spriteCache.traps[index] as GridSprite;
                 trapSprite.setPosition(
                     trap.x * this.cellSize + this.cellSize / 2,
                     trap.y * this.cellSize + this.cellSize / 2
                 );
                 trapSprite.setVisible(true);
+                configureAnimatedEnemySprite(this.scene, trapSprite, 'lelar', this.cellSize);
             } else {
-                trapSprite = this.scene.add.sprite(
+                trapSprite = createAnimatedEnemySprite(
+                    this.scene,
                     trap.x * this.cellSize + this.cellSize / 2,
                     trap.y * this.cellSize + this.cellSize / 2,
-                    'trap'
-                );
-                const trapScale = calculateSpriteScale('trap', this.cellSize, this.scene);
-                trapSprite.setScale(trapScale);
+                    'lelar',
+                    this.cellSize
+                ) as GridSprite;
                 this.spriteCache.traps[index] = trapSprite;
             }
 
-            // Spinning animation with staggered start
-            const staggerDelay = Phaser.Math.Between(0, 2000);
-            this.scene.time.delayedCall(staggerDelay, () => {
-                if (trapSprite?.active) {
-                    this.scene.tweens.add({
-                        targets: trapSprite,
-                        angle: 360,
-                        duration: 1500,
-                        ease: 'Cubic.InOut',
-                        repeat: -1,
-                        onRepeat: () => trapSprite.setAngle(0)
-                    });
-                }
-            });
-
+            trapSprite.gridX = trap.x;
+            trapSprite.gridY = trap.y;
             this.trapSprites.push(trapSprite);
         });
+    }
+
+    getLelarVisualStates(): Array<{
+        x: number | null;
+        y: number | null;
+        frame: string | number | null;
+        animation: string | null;
+        isPlaying: boolean;
+    }> {
+        return this.trapSprites.map((sprite) => ({
+            x: sprite.gridX ?? null,
+            y: sprite.gridY ?? null,
+            frame: sprite.frame.name ?? null,
+            animation: sprite.anims.currentAnim?.key ?? null,
+            isPlaying: sprite.anims.isPlaying
+        }));
     }
 
     /**
