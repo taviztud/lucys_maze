@@ -91,6 +91,21 @@ export interface StaticAssetDefinition {
     rotationDurationMs: number;
 }
 
+export type BoardBackgroundAssetId = 'forest_entrance' | 'maze_approach' | 'temple_floor';
+
+export interface BoardBackgroundAssetDefinition {
+    id: BoardBackgroundAssetId;
+    name: string;
+    category: 'tile';
+    textureKey: string;
+    imageUrl: string;
+    fileName: string;
+    mode: 'cover' | 'tile';
+    alpha: number;
+    overlayAlpha: number;
+    patternCellSpan: number;
+}
+
 export interface SpriteAssetConfig {
     id: string;
     name: string;

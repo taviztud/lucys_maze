@@ -4,6 +4,9 @@ import { generateFreePosition } from '../utils/Utils';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import type { Position, Direction, Enemy } from '../types/game.types';
 import { createAnimatedEnemySprite } from './enemyAnimations';
+import { getAnimation } from '../visuals/assetRegistry';
+
+const WORM_SCALE_MULTIPLIERS = [0.4, 0.55, 0.7, 0.8] as const;
 
 /**
  * Gestor de enemigos regulares con movimiento aleatorio
@@ -57,13 +60,20 @@ export class EnemyManager {
                 sprite: null
             };
 
+            const frameCount = getAnimation('worm_walk').frames.length;
+            const startFrame = (level + i * 3) % frameCount;
+            const scaleMultiplier = WORM_SCALE_MULTIPLIERS[i % WORM_SCALE_MULTIPLIERS.length];
+
             enemy.sprite = createAnimatedEnemySprite(
                 this.scene,
                 enemy.x * this.cellSize + this.cellSize / 2,
                 enemy.y * this.cellSize + this.cellSize / 2,
                 'worm',
-                this.cellSize
+                this.cellSize,
+                { startFrame, scaleMultiplier }
             );
+
+            enemy.sprite.setData({ startFrame, scaleMultiplier });
 
             enemy.sprite.setFlipX(enemy.direction.dx === -1);
 

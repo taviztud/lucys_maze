@@ -73,8 +73,8 @@ export interface PresetAsset {
     name: string;
     category: AssetCategory;
     url: string;
-    defaultFrameWidth: number;
-    defaultFrameHeight: number;
+    defaultFrameWidth?: number;
+    defaultFrameHeight?: number;
     defaultFps: number;
     atlas?: PhaserAtlasJSON;
     targetJsonPath?: string;

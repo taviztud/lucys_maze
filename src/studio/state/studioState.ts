@@ -93,7 +93,8 @@ class StudioStore {
         category: AssetCategory = 'player',
         suggestedFrameWidth?: number,
         suggestedFrameHeight?: number,
-        customAnimations?: AnimationTrack[]
+        customAnimations?: AnimationTrack[],
+        targetImagePath: string | null = null
     ): Promise<void> {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -154,7 +155,7 @@ class StudioStore {
                     category,
                     textureKey: cleanTextureKey(name),
                     targetJsonPath: null,
-                    targetImagePath: null,
+                    targetImagePath,
                     frameRects: null,
                     frameWidth: fw,
                     frameHeight: fh,

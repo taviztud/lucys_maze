@@ -6,9 +6,14 @@ import lelarIdleAtlas from '../assets/sprites/enemies/lelar_idle.json';
 import lelarIdleSheetUrl from '../assets/sprites/enemies/lelar_idle.png?url';
 import spiderWalkAtlas from '../assets/sprites/enemies/spider_walk.json';
 import spiderWalkSheetUrl from '../assets/sprites/enemies/spider_walk.png?url';
+import forestEntranceUrl from '../assets/sprites/tiles/backgrounds/forest_entrance.png?url';
+import mazeApproachUrl from '../assets/sprites/tiles/backgrounds/maze_approach.png?url';
+import templeFloorUrl from '../assets/sprites/tiles/backgrounds/temple_floor.png?url';
 import type {
     AnimatedAssetDefinition,
     AnimatedAssetId,
+    BoardBackgroundAssetDefinition,
+    BoardBackgroundAssetId,
     PhaserAnimationJSON,
     PhaserAtlasJSON,
     StaticAssetDefinition
@@ -109,6 +114,30 @@ export const STATIC_ASSETS: Record<StaticAssetDefinition['id'], StaticAssetDefin
         depth: 6,
         rotationDurationMs: 1200
     }
+};
+
+const background = (
+    id: BoardBackgroundAssetId,
+    name: string,
+    imageUrl: string,
+    fileName: string
+): BoardBackgroundAssetDefinition => ({
+    id,
+    name,
+    category: 'tile',
+    textureKey: `board:${id}`,
+    imageUrl,
+    fileName,
+    mode: 'tile',
+    alpha: 1,
+    overlayAlpha: 0.08,
+    patternCellSpan: 16
+});
+
+export const BOARD_BACKGROUNDS: Record<BoardBackgroundAssetId, BoardBackgroundAssetDefinition> = {
+    forest_entrance: background('forest_entrance', 'Forest Entrance', forestEntranceUrl, 'forest_entrance.png'),
+    maze_approach: background('maze_approach', 'Maze Approach', mazeApproachUrl, 'maze_approach.png'),
+    temple_floor: background('temple_floor', 'Temple Floor', templeFloorUrl, 'temple_floor.png')
 };
 
 export function getAnimation(id: AnimatedAssetId): PhaserAnimationJSON {

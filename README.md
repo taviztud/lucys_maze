@@ -6,7 +6,7 @@
 
 
 
-![Version](https://img.shields.io/badge/version-0.1.6--alpha-blue)
+![Version](https://img.shields.io/badge/version-0.1.7--alpha-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Phaser](https://img.shields.io/badge/engine-Phaser%203-orange)
 ![TypeScript](https://img.shields.io/badge/language-TypeScript-blue)
@@ -24,12 +24,13 @@
 
 **Lucy's Maze** is a fast-paced arcade game inspired by "Tomb of the Mask". Help Lucy the Chihuahua navigate through intricate mazes, collect coins, avoid traps, and find the exit!
 
-### Features (Alpha 0.1.6)
+### Features (Alpha 0.1.7)
 - **Responsive Gameplay:** Works on Desktop and Mobile devices
 - **Controls:** Keyboard arrows (Desktop) and Swipe gestures (Mobile)
 - **New UI:** Clean bottom control bar for both music and game actions
 - **High Scores:** Local leaderboard system to track your best runs
 - **Retro Aesthetics:** Pixel art style with neon grid effects
+- **Progressive Scenarios:** Forest entrance, maze approach, and temple floor backgrounds change every ten levels
 - **Animated Lucy:** Eight-frame idle animation with consistent visual sizing across idle, running, and death states
 - **Progressive Difficulty:** 
   - Phase 1 (1-10): Fast acceleration
@@ -124,12 +125,13 @@ lucys-maze/
 
 **Lucy's Maze** es un juego arcade de ritmo rápido inspirado en "Tomb of the Mask". ¡Ayuda a Lucy la Chihuahua a navegar por laberintos intrincados, recolectar monedas, evitar trampas y encontrar la salida!
 
-### Características (Alfa 0.1.6)
+### Características (Alfa 0.1.7)
 - **Jugabilidad Responsiva:** Funciona en PC y dispositivos móviles
 - **Controles:** Flechas del teclado (PC) y gestos de deslizamiento (Móvil)
 - **Nueva UI:** Barra de controles inferior limpia para música y acciones de juego
 - **Récords:** Sistema de puntuación alta local
 - **Estética Retro:** Estilo pixel art con efectos de cuadrícula neón
+- **Escenarios progresivos:** La entrada del bosque, la antesala del laberinto y el piso del templo cambian cada diez niveles
 - **Lucy animada:** Animación idle de ocho cuadros con tamaño visual consistente al estar quieta, correr y morir
 - **Dificultad Progresiva:** 
   - Fase 1 (1-10): Aceleración rápida

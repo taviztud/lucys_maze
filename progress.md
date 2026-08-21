@@ -47,6 +47,17 @@ Original prompt: Corregir localmente que el cadáver de Lucy permanezca visible 
 - Validacion final de progresion: nivel 20 genera exactamente dos Spider y nivel 31 exactamente tres; todas reportan `angle: 0`, `flipX: false`, animacion activa y telarana creciente/retractil. En nivel 31 conviven Spin y Lelar con escala 0.55/0.75/1 sin agregar trampas logicas.
 - `npm ci`, `npm run assets:verify`, `npx tsc --noEmit`, `npm run build`, `npm run build:ihost` y `git diff --check` pasan. El juego y Studio cargan sus assets sin 404 ni errores de consola. El proyecto no define scripts separados de lint o tests.
 - La validacion iHost detecto y corrigio dos rutas de Studio dependientes de la base desplegada: la API de descubrimiento se limita a desarrollo y la referencia de Lucy usa `BASE_URL`.
+- Ajuste local sin commit solicitado: Worm inicia desfasado por instancia y usa escalas discretas deterministas entre 0.40 y 0.80; `render_game_to_text` expone ambos valores.
+- Validado en nivel 26: cuatro Worm usan frames iniciales `2/5/0/3`, escalas `0.40/0.55/0.70/0.80`, avanzan manteniendo el desfase y no generan errores de consola.
+
+## Fondos progresivos 0.1.7
+
+- Los tres fondos entregados quedaron saneados y ubicados en `src/assets/sprites/tiles/backgrounds/` con nombres canónicos: entrada del bosque, antesala del laberinto y piso del templo.
+- La carga usa el registro visual compartido. Cada escenario dura diez niveles, cicla después del tercero y combina de forma independiente los cinco colores de grilla existentes.
+- El patrón se dibuja con `TileSprite` sobre una referencia de 16×16 celdas, con una capa cromática tenue por encima; la geometría, entidades y gameplay no cambian.
+- Studio recibe los fondos desde el mismo registro y `assets:verify` valida presencia, formato, dimensiones cuadradas y canales de color.
+- Versión de la aplicación actualizada a `0.1.7` en los metadatos y README.
+- Validación visual completada en niveles 1, 10, 11, 20, 21, 30 y 31: los cambios ocurren solo al cruzar cada bloque de diez niveles. Studio, movimiento, restart y menú funcionan sin errores ni advertencias de consola.
 
 ## TODO Worm y Lelar
 

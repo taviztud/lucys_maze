@@ -4,7 +4,7 @@
 
 Lucy’s Maze usa un registro tipado compartido en `src/visuals/assetRegistry.ts`. Contiene los atlas animados de Lucy, Worm, Lelar y Spider, además del asset estático Spin. `src/visuals/animations.ts` es el único punto de preload, registro, reproducción, frame inicial, profundidad y escala por frame.
 
-Los perfiles de nivel viven en `src/visuals/levelVisuals.ts`; no se deben duplicar umbrales en managers o renderers. Los atlas del jugador están en `src/assets/sprites/player/` y los enemigos en `src/assets/sprites/enemies/`. Las láminas auxiliares no usadas por el juego viven bajo `source/`.
+Los perfiles de nivel viven en `src/visuals/levelVisuals.ts`; no se deben duplicar umbrales en managers o renderers. Los atlas del jugador están en `src/assets/sprites/player/`, los enemigos en `src/assets/sprites/enemies/` y los fondos en `src/assets/sprites/tiles/backgrounds/`. Las láminas auxiliares no usadas por el juego viven bajo `source/`.
 
 ## Formato Studio / Phaser
 
@@ -31,19 +31,21 @@ Convenciones:
 4. Managers y renderers solicitan sprites por ID; la escala usa frame, celda, ratio del atlas y multiplicador de instancia.
 5. Restart y shutdown destruyen sprites, gráficos y tweens de instancia.
 
-Worm conserva movimiento y orientación. Lelar permanece estático, empieza en un frame determinista y usa escala `0.55`, `0.75` o `1`, con mayor peso pequeño/medio. Spin reutiliza exactamente `mazeData.traps`: solo cambia el visual y gira mediante configuración central.
+Worm conserva movimiento y orientación; cada instancia empieza en un frame distinto y usa una escala determinista entre `0.40` y `0.80`. Lelar permanece estático, empieza en un frame determinista y usa escala `0.55`, `0.75` o `1`, con mayor peso pequeño/medio. Spin reutiliza exactamente `mazeData.traps`: solo cambia el visual y gira mediante configuración central.
 
 Spider reproduce `spider_walk:idle` sin rotar ni reflejar el asset. Patrulla A↔B a 3 celdas/s, espera 2 segundos y dibuja una línea blanca desde A hasta su posición. Las celdas cubiertas bloquean y dañan a Lucy; el hilo crece al salir y libera celdas al regresar. El contacto reutiliza escudo, invencibilidad y game over.
 
 ## Progresion
 
-- Temas: cambian cada 10 niveles usando los cinco colores existentes y luego ciclan. El fondo opcional admite `cover` o `tile`, pero actualmente es `null`.
+- Escenarios: cambian cada 10 niveles en el orden entrada del bosque (`forest_entrance`), antesala del laberinto (`maze_approach`) y piso del templo (`temple_floor`); después ciclan.
+- Fondos: se registran una sola vez en `BOARD_BACKGROUNDS`, se renderizan como `TileSprite` y el patrón representa 16×16 celdas. El color neón del bloque de nivel se aplica como una capa tenue encima y también colorea la grilla.
+- Colores: cambian cada 10 niveles usando los cinco colores existentes y luego ciclan independientemente de los tres escenarios.
 - Spin: 0% en 1–10, 10% en 11–20, 20% en 21–30 y 30% desde 31, sin crear trampas.
 - Spider: 0 en 1–9; 1 con alcance 3 en 10–19; 2 con alcance 5 en 20–29; 3 con alcance 7 desde 30.
 
 ## Studio
 
-`npm run studio` abre `/studio/`. Studio importa el mismo registro que el juego, consulta la API local para descubrir pares y admite varios PNG/JSON. Edita grilla o rectángulos existentes, offsets, pivote, ratio/tamaño objetivo, secuencia, FPS, duración por frame, frame inicial, repetición y yoyo.
+`npm run studio` abre `/studio/`. Studio importa el mismo registro que el juego, incluidos los tres fondos, consulta la API local para descubrir pares y admite varios PNG/JSON. Edita grilla o rectángulos existentes, offsets, pivote, ratio/tamaño objetivo, secuencia, FPS, duración por frame, frame inicial, repetición y yoyo.
 
 Preview, copiar, descargar y guardar producen el mismo payload. Se validan dimensiones, límites, referencias y reproducción. La API solo escribe en `src/assets/sprites/` o `public/` y existe únicamente en desarrollo; Studio desplegado conserva inspección, preview y descarga.
 
@@ -63,6 +65,7 @@ Archivos principales: `src/visuals/assetRegistry.ts`, `src/visuals/animations.ts
 ```bash
 npm ci
 npm run assets:verify
+npm run backgrounds:verify
 npx tsc --noEmit
 npm run build
 npm run build:ihost

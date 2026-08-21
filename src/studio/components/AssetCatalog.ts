@@ -1,7 +1,7 @@
 import { studioStore } from '../state/studioState';
 import type { PresetAsset, AssetCategory } from '../types/studio.types';
 import type { PhaserAtlasJSON } from '../../types/animation.types';
-import { ANIMATED_ASSETS } from '../../visuals/assetRegistry';
+import { ANIMATED_ASSETS, BOARD_BACKGROUNDS } from '../../visuals/assetRegistry';
 import { showToast } from '../utils/phaserExport';
 
 const CATEGORY_BY_FOLDER: Record<string, AssetCategory> = {
@@ -14,7 +14,7 @@ const CATEGORY_BY_FOLDER: Record<string, AssetCategory> = {
     tiles: 'tile'
 };
 
-export const GAME_PRESETS: PresetAsset[] = Object.values(ANIMATED_ASSETS).map((definition) => {
+const ANIMATED_PRESETS: PresetAsset[] = Object.values(ANIMATED_ASSETS).map((definition) => {
     const folder = definition.category === 'player' ? 'player' : 'enemies';
     const imageName = definition.atlas.meta.image;
     return {
@@ -30,6 +30,17 @@ export const GAME_PRESETS: PresetAsset[] = Object.values(ANIMATED_ASSETS).map((d
         targetJsonPath: `src/assets/sprites/${folder}/${imageName.replace(/\.png$/i, '.json')}`
     };
 });
+
+const BACKGROUND_PRESETS: PresetAsset[] = Object.values(BOARD_BACKGROUNDS).map((definition) => ({
+    id: definition.id,
+    name: definition.name,
+    category: definition.category,
+    url: definition.imageUrl,
+    defaultFps: 1,
+    targetImagePath: `src/assets/sprites/tiles/backgrounds/${definition.fileName}`
+}));
+
+export const GAME_PRESETS: PresetAsset[] = [...ANIMATED_PRESETS, ...BACKGROUND_PRESETS];
 
 interface ApiAsset {
     id: string;
@@ -115,7 +126,9 @@ export class AssetCatalog {
                     preset.id,
                     preset.category,
                     preset.defaultFrameWidth,
-                    preset.defaultFrameHeight
+                    preset.defaultFrameHeight,
+                    undefined,
+                    preset.targetImagePath ?? null
                 );
             }
         });

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { calculateSpriteScale } from '../utils/Utils';
 import type { AnimatedAssetId, PhaserAnimationJSON } from '../types/animation.types';
-import { ANIMATED_ASSETS, STATIC_ASSETS, getAnimation, getFirstFrame } from './assetRegistry';
+import { ANIMATED_ASSETS, BOARD_BACKGROUNDS, STATIC_ASSETS, getAnimation, getFirstFrame } from './assetRegistry';
 
 export interface ConfigureAnimatedSpriteOptions {
     startFrame?: number;
@@ -16,6 +16,11 @@ export function preloadVisualAssets(scene: Phaser.Scene): void {
         }
     });
     Object.values(STATIC_ASSETS).forEach((definition) => {
+        if (!scene.textures.exists(definition.textureKey)) {
+            scene.load.image(definition.textureKey, definition.imageUrl);
+        }
+    });
+    Object.values(BOARD_BACKGROUNDS).forEach((definition) => {
         if (!scene.textures.exists(definition.textureKey)) {
             scene.load.image(definition.textureKey, definition.imageUrl);
         }

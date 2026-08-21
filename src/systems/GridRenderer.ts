@@ -28,6 +28,7 @@ export class GridRenderer {
     private height: number;
     private gridGroup: Phaser.GameObjects.Group | null = null;
     private backgroundObject: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite | null = null;
+    private backgroundOverlay: Phaser.GameObjects.Rectangle | null = null;
     private currentLevel: number = 1;
     private currentTheme: BoardTheme = getLevelVisualProfile(1).theme;
     private spriteCache: SpriteCache = { coins: [], obstacles: [], traps: [] };
@@ -280,11 +281,23 @@ export class GridRenderer {
         }));
     }
 
-    getThemeState(): { id: string; gridColor: string; background: string | null } {
+    getThemeState(): {
+        id: string;
+        name: string;
+        gridColor: string;
+        background: string;
+        mode: 'cover' | 'tile';
+        patternCellSpan: number;
+        overlayAlpha: number;
+    } {
         return {
             id: this.currentTheme.id,
+            name: this.currentTheme.name,
             gridColor: `#${this.currentTheme.gridColor.toString(16).padStart(6, '0')}`,
-            background: this.currentTheme.background?.textureKey ?? null
+            background: this.currentTheme.background.textureKey,
+            mode: this.currentTheme.background.mode,
+            patternCellSpan: this.currentTheme.background.patternCellSpan,
+            overlayAlpha: this.currentTheme.background.overlayAlpha
         };
     }
 
@@ -351,15 +364,31 @@ export class GridRenderer {
 
     private drawBackground(theme: BoardTheme): void {
         this.backgroundObject?.destroy();
+        this.backgroundOverlay?.destroy();
         this.backgroundObject = null;
+        this.backgroundOverlay = null;
         const background = theme.background;
-        if (!background || !this.scene.textures.exists(background.textureKey)) return;
+        if (!this.scene.textures.exists(background.textureKey)) return;
         const width = this.width * this.cellSize;
         const height = this.height * this.cellSize;
-        this.backgroundObject = background.mode === 'tile'
-            ? this.scene.add.tileSprite(0, 0, width, height, background.textureKey).setOrigin(0)
-            : this.scene.add.image(0, 0, background.textureKey).setOrigin(0).setDisplaySize(width, height);
+        if (background.mode === 'tile') {
+            const source = this.scene.textures.get(background.textureKey).source[0];
+            const tile = this.scene.add.tileSprite(0, 0, width, height, background.textureKey).setOrigin(0);
+            tile.setTileScale(
+                (this.cellSize * background.patternCellSpan) / source.width,
+                (this.cellSize * background.patternCellSpan) / source.height
+            );
+            this.backgroundObject = tile;
+        } else {
+            this.backgroundObject = this.scene.add.image(0, 0, background.textureKey)
+                .setOrigin(0)
+                .setDisplaySize(width, height);
+        }
         this.backgroundObject.setAlpha(background.alpha).setDepth(-10);
+        this.backgroundOverlay = this.scene.add.rectangle(0, 0, width, height, theme.gridColor)
+            .setOrigin(0)
+            .setAlpha(background.overlayAlpha)
+            .setDepth(-9);
     }
 
     /**
@@ -583,5 +612,6 @@ export class GridRenderer {
         if (this.shieldSprite) this.shieldSprite.destroy();
         if (this.gridGroup) this.gridGroup.clear(true, true);
         if (this.backgroundObject) this.backgroundObject.destroy();
+        if (this.backgroundOverlay) this.backgroundOverlay.destroy();
     }
 }

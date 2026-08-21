@@ -1,16 +1,12 @@
 import { CONFIG } from '../Config';
-
-export interface BoardBackground {
-    textureKey: string;
-    imageUrl: string;
-    mode: 'cover' | 'tile';
-    alpha: number;
-}
+import { BOARD_BACKGROUNDS } from './assetRegistry';
+import type { BoardBackgroundAssetDefinition, BoardBackgroundAssetId } from '../types/animation.types';
 
 export interface BoardTheme {
     id: string;
+    name: string;
     gridColor: number;
-    background: BoardBackground | null;
+    background: BoardBackgroundAssetDefinition;
 }
 
 export interface SpiderLevelProfile {
@@ -24,21 +20,24 @@ export interface LevelVisualProfile {
     spider: SpiderLevelProfile;
 }
 
-const THEMES: BoardTheme[] = CONFIG.BACKGROUND_COLORS.map((gridColor, index) => ({
-    id: `neon-${index + 1}`,
-    gridColor,
-    background: null
-}));
-
-export function getBoardThemes(): readonly BoardTheme[] {
-    return THEMES;
-}
+const BACKGROUND_SEQUENCE: readonly BoardBackgroundAssetId[] = [
+    'forest_entrance',
+    'maze_approach',
+    'temple_floor'
+];
 
 export function getLevelVisualProfile(level: number): LevelVisualProfile {
     const safeLevel = Math.max(1, Math.floor(level));
     const themeBand = Math.floor((safeLevel - 1) / 10);
+    const background = BOARD_BACKGROUNDS[BACKGROUND_SEQUENCE[themeBand % BACKGROUND_SEQUENCE.length]];
+    const colorIndex = themeBand % CONFIG.BACKGROUND_COLORS.length;
     return {
-        theme: THEMES[themeBand % THEMES.length],
+        theme: {
+            id: `${background.id}-neon-${colorIndex + 1}`,
+            name: background.name,
+            gridColor: CONFIG.BACKGROUND_COLORS[colorIndex],
+            background
+        },
         spinRatio: safeLevel <= 10 ? 0 : safeLevel <= 20 ? 0.1 : safeLevel <= 30 ? 0.2 : 0.3,
         spider: getSpiderProfile(safeLevel)
     };

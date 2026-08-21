@@ -6,7 +6,6 @@ import { InputManager } from '../managers/InputManager';
 import { musicManager, type MusicPlaybackState } from '../managers/MusicManager';
 import { PlayerController } from '../managers/PlayerController';
 import { preloadVisualAssets, registerVisualAnimations } from '../visuals/animations';
-import { getBoardThemes } from '../visuals/levelVisuals';
 import { EnemyManager } from '../managers/EnemyManager';
 import { SpiderManager } from '../managers/SpiderManager';
 import { UIManager } from '../managers/UIManager';
@@ -67,11 +66,6 @@ export class GameScene extends Phaser.Scene {
         try {
             // Load images
             preloadVisualAssets(this);
-            getBoardThemes().forEach(({ background }) => {
-                if (background && !this.textures.exists(background.textureKey)) {
-                    this.load.image(background.textureKey, background.imageUrl);
-                }
-            });
             this.load.image('player_run', 'lucy_run.png');
             this.load.image('player_die', 'lucy_die.png');
             this.load.image('coin', 'coin_tuto.png');
@@ -194,7 +188,9 @@ export class GameScene extends Phaser.Scene {
                 frame: enemy.sprite?.frame.name ?? null,
                 animation: enemy.sprite?.anims.currentAnim?.key ?? null,
                 isPlaying: enemy.sprite?.anims.isPlaying ?? false,
-                flipX: enemy.sprite?.flipX ?? false
+                flipX: enemy.sprite?.flipX ?? false,
+                startFrame: enemy.sprite?.getData('startFrame') ?? null,
+                scaleMultiplier: enemy.sprite?.getData('scaleMultiplier') ?? null
             })),
             spiders: this.spiderManager.getVisualStates(),
             music: {
