@@ -24,7 +24,7 @@ export class ScaleComparer {
             this.render(studioStore.getState());
         };
         // Use normalized player idle or fallback
-        img.src = '/lucy_stand.png';
+        img.src = `${import.meta.env.BASE_URL}lucy_stand.png`;
     }
 
     public render(state: StudioState): void {

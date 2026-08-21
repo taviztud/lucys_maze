@@ -46,6 +46,7 @@ Original prompt: Corregir localmente que el cadáver de Lucy permanezca visible 
 - Validacion visual: nivel 10 muestra una Spider sin giro/espejo; nivel 30 muestra tres, hilos blancos, Spin y Lelars de tres tamanos. `render_game_to_text` coincide con las capturas.
 - Validacion final de progresion: nivel 20 genera exactamente dos Spider y nivel 31 exactamente tres; todas reportan `angle: 0`, `flipX: false`, animacion activa y telarana creciente/retractil. En nivel 31 conviven Spin y Lelar con escala 0.55/0.75/1 sin agregar trampas logicas.
 - `npm ci`, `npm run assets:verify`, `npx tsc --noEmit`, `npm run build`, `npm run build:ihost` y `git diff --check` pasan. El juego y Studio cargan sus assets sin 404 ni errores de consola. El proyecto no define scripts separados de lint o tests.
+- La validacion iHost detecto y corrigio dos rutas de Studio dependientes de la base desplegada: la API de descubrimiento se limita a desarrollo y la referencia de Lucy usa `BASE_URL`.
 
 ## TODO Worm y Lelar
 

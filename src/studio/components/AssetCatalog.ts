@@ -77,6 +77,8 @@ export class AssetCatalog {
         this.container.replaceChildren();
         GAME_PRESETS.forEach((preset) => this.appendPreset(preset));
 
+        if (!import.meta.env.DEV) return;
+
         try {
             const response = await fetch(new URL('../api/assets/list', window.location.href));
             if (!response.ok) return;
