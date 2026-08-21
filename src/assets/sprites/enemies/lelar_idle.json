@@ -202,7 +202,10 @@
       "w": 2176,
       "h": 724
     },
-    "scale": "1"
+    "scale": "1",
+    "lucysMaze": {
+      "targetCellRatio": 1
+    }
   },
   "anims": [
     {

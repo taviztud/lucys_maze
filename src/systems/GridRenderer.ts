@@ -3,6 +3,8 @@ import { CONFIG } from '../Config';
 import { calculateSpriteScale } from '../utils/Utils';
 import { configureAnimatedEnemySprite, createAnimatedEnemySprite } from '../managers/enemyAnimations';
 import type { Position, Obstacle, SpriteCache, GridSprite, ObstacleSprite } from '../types/game.types';
+import { STATIC_ASSETS, getAnimation } from '../visuals/assetRegistry';
+import { deterministicUnit, getLevelVisualProfile, type BoardTheme } from '../visuals/levelVisuals';
 
 /**
  * Datos de entidades para renderizar
@@ -25,6 +27,9 @@ export class GridRenderer {
     private width: number;
     private height: number;
     private gridGroup: Phaser.GameObjects.Group | null = null;
+    private backgroundObject: Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite | null = null;
+    private currentLevel: number = 1;
+    private currentTheme: BoardTheme = getLevelVisualProfile(1).theme;
     private spriteCache: SpriteCache = { coins: [], obstacles: [], traps: [] };
 
     // Entity sprites
@@ -49,9 +54,11 @@ export class GridRenderer {
      * Crea el grid visual según el nivel
      */
     createGrid(level: number): void {
+        this.currentLevel = level;
+        this.currentTheme = getLevelVisualProfile(level).theme;
         this.scene.cameras.main.setBackgroundColor(CONFIG.UI.MAIN_BACKGROUND_COLOR);
-
-        const neonColor = CONFIG.BACKGROUND_COLORS[(level - 1) % CONFIG.BACKGROUND_COLORS.length];
+        this.drawBackground(this.currentTheme);
+        const neonColor = this.currentTheme.gridColor;
 
         if (this.gridGroup?.children) {
             this.gridGroup.clear(true, true);
@@ -60,6 +67,7 @@ export class GridRenderer {
         }
 
         const graphics = this.scene.add.graphics();
+        graphics.setDepth(0);
         graphics.lineStyle(1, neonColor, CONFIG.GRID_ALPHA);
 
         // Vertical lines
@@ -86,6 +94,7 @@ export class GridRenderer {
                     2, 2, neonColor
                 );
                 dot.setAlpha(0.6);
+                dot.setDepth(0);
                 this.gridGroup.add(dot);
             }
         }
@@ -215,11 +224,14 @@ export class GridRenderer {
         });
     }
 
-    /** Dibuja a Lelar en las posiciones peligrosas del laberinto. */
+    /** Draws one deterministic Lelar or Spin visual for every logical trap. */
     private drawTraps(traps: Position[]): void {
         this.trapSprites = [];
+        const variants = this.createTrapVariants(traps);
         traps.forEach((trap, index) => {
             let trapSprite: GridSprite;
+            const variant = variants[index];
+            const scaleMultiplier = this.getLelarScale(trap, index);
 
             if (this.spriteCache.traps[index]?.active) {
                 trapSprite = this.spriteCache.traps[index] as GridSprite;
@@ -228,38 +240,126 @@ export class GridRenderer {
                     trap.y * this.cellSize + this.cellSize / 2
                 );
                 trapSprite.setVisible(true);
-                configureAnimatedEnemySprite(this.scene, trapSprite, 'lelar', this.cellSize);
             } else {
-                trapSprite = createAnimatedEnemySprite(
-                    this.scene,
+                trapSprite = this.scene.add.sprite(
                     trap.x * this.cellSize + this.cellSize / 2,
                     trap.y * this.cellSize + this.cellSize / 2,
-                    'lelar',
-                    this.cellSize
+                    variant === 'spin' ? STATIC_ASSETS.spin.textureKey : 'lelar_idle'
                 ) as GridSprite;
                 this.spriteCache.traps[index] = trapSprite;
             }
 
+            this.configureTrapSprite(trapSprite, variant, trap, index, scaleMultiplier);
             trapSprite.gridX = trap.x;
             trapSprite.gridY = trap.y;
+            trapSprite.trapVariant = variant;
+            trapSprite.visualScaleMultiplier = variant === 'lelar' ? scaleMultiplier : 1;
             this.trapSprites.push(trapSprite);
         });
     }
 
-    getLelarVisualStates(): Array<{
+    getTrapVisualStates(): Array<{
         x: number | null;
         y: number | null;
+        variant: 'lelar' | 'spin';
+        scaleMultiplier: number;
         frame: string | number | null;
         animation: string | null;
         isPlaying: boolean;
+        angle: number;
     }> {
         return this.trapSprites.map((sprite) => ({
             x: sprite.gridX ?? null,
             y: sprite.gridY ?? null,
+            variant: sprite.trapVariant ?? 'lelar',
+            scaleMultiplier: sprite.visualScaleMultiplier ?? 1,
             frame: sprite.frame.name ?? null,
             animation: sprite.anims.currentAnim?.key ?? null,
-            isPlaying: sprite.anims.isPlaying
+            isPlaying: sprite.anims.isPlaying,
+            angle: Number(sprite.angle.toFixed(2))
         }));
+    }
+
+    getThemeState(): { id: string; gridColor: string; background: string | null } {
+        return {
+            id: this.currentTheme.id,
+            gridColor: `#${this.currentTheme.gridColor.toString(16).padStart(6, '0')}`,
+            background: this.currentTheme.background?.textureKey ?? null
+        };
+    }
+
+    private createTrapVariants(traps: Position[]): Array<'lelar' | 'spin'> {
+        const ratio = getLevelVisualProfile(this.currentLevel).spinRatio;
+        if (ratio <= 0 || traps.length === 0) return traps.map(() => 'lelar');
+        let spinCount = Math.max(1, Math.round(traps.length * ratio));
+        if (traps.length >= 2) spinCount = Math.min(spinCount, traps.length - 1);
+        const ranked = traps.map((trap, index) => ({
+            index,
+            rank: deterministicUnit(this.currentLevel, trap.x, trap.y, index, 0x51f15e)
+        })).sort((left, right) => left.rank - right.rank);
+        const spins = new Set(ranked.slice(0, spinCount).map(({ index }) => index));
+        return traps.map((_trap, index) => spins.has(index) ? 'spin' : 'lelar');
+    }
+
+    private getLelarScale(trap: Position, index: number): number {
+        const choices = [0.55, 0.55, 0.75, 0.75, 1];
+        const unit = deterministicUnit(this.currentLevel, trap.x, trap.y, index, 0x1e1a4);
+        return choices[Math.min(choices.length - 1, Math.floor(unit * choices.length))];
+    }
+
+    private configureTrapSprite(
+        sprite: GridSprite,
+        variant: 'lelar' | 'spin',
+        trap: Position,
+        index: number,
+        scaleMultiplier: number
+    ): void {
+        if (variant === 'lelar') {
+            sprite.spinTween?.stop();
+            sprite.spinTween = null;
+            sprite.setAngle(0);
+            const frameCount = getAnimation('lelar_idle').frames.length;
+            const startFrame = Math.floor(
+                deterministicUnit(this.currentLevel, trap.x, trap.y, index, 0x1d1e) * frameCount
+            );
+            configureAnimatedEnemySprite(this.scene, sprite, 'lelar', this.cellSize, {
+                startFrame,
+                scaleMultiplier
+            });
+            return;
+        }
+
+        if (sprite.texture.key !== STATIC_ASSETS.spin.textureKey) {
+            sprite.anims.stop();
+            sprite.setTexture(STATIC_ASSETS.spin.textureKey);
+        }
+        sprite.setScale(calculateSpriteScale(
+            STATIC_ASSETS.spin.textureKey,
+            this.cellSize * STATIC_ASSETS.spin.targetCellRatio,
+            this.scene
+        )).setDepth(STATIC_ASSETS.spin.depth);
+        if (!sprite.spinTween) {
+            sprite.spinTween = this.scene.tweens.add({
+                targets: sprite,
+                angle: 360,
+                duration: STATIC_ASSETS.spin.rotationDurationMs,
+                repeat: -1,
+                ease: 'Linear'
+            });
+        }
+    }
+
+    private drawBackground(theme: BoardTheme): void {
+        this.backgroundObject?.destroy();
+        this.backgroundObject = null;
+        const background = theme.background;
+        if (!background || !this.scene.textures.exists(background.textureKey)) return;
+        const width = this.width * this.cellSize;
+        const height = this.height * this.cellSize;
+        this.backgroundObject = background.mode === 'tile'
+            ? this.scene.add.tileSprite(0, 0, width, height, background.textureKey).setOrigin(0)
+            : this.scene.add.image(0, 0, background.textureKey).setOrigin(0).setDisplaySize(width, height);
+        this.backgroundObject.setAlpha(background.alpha).setDepth(-10);
     }
 
     /**
@@ -460,6 +560,8 @@ export class GridRenderer {
         Object.keys(this.spriteCache).forEach(key => {
             const cacheKey = key as keyof SpriteCache;
             this.spriteCache[cacheKey].forEach(sprite => {
+                const gridSprite = sprite as GridSprite;
+                gridSprite.spinTween?.stop();
                 if (sprite?.destroy) {
                     sprite.destroy();
                 }
@@ -480,5 +582,6 @@ export class GridRenderer {
         if (this.saveSprite) this.saveSprite.destroy();
         if (this.shieldSprite) this.shieldSprite.destroy();
         if (this.gridGroup) this.gridGroup.clear(true, true);
+        if (this.backgroundObject) this.backgroundObject.destroy();
     }
 }

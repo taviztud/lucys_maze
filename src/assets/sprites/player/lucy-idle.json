@@ -170,6 +170,29 @@
       "w": 1152,
       "h": 576
     },
-    "scale": "1"
-  }
+    "scale": "1",
+    "lucysMaze": {
+      "targetCellRatio": 1
+    }
+  },
+  "anims": [
+    {
+      "key": "player:idle",
+      "type": "frame",
+      "frames": [
+        { "key": "player:idle-texture", "frame": "idle_00" },
+        { "key": "player:idle-texture", "frame": "idle_01" },
+        { "key": "player:idle-texture", "frame": "idle_02" },
+        { "key": "player:idle-texture", "frame": "idle_03" },
+        { "key": "player:idle-texture", "frame": "idle_04" },
+        { "key": "player:idle-texture", "frame": "idle_05" },
+        { "key": "player:idle-texture", "frame": "idle_06" },
+        { "key": "player:idle-texture", "frame": "idle_07" }
+      ],
+      "frameRate": 6,
+      "repeat": -1,
+      "yoyo": false,
+      "startFrame": 0
+    }
+  ]
 }

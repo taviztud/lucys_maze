@@ -53,10 +53,9 @@ export const CONFIG: GameConfig = {
     SPIDER: {
         MIN_PATROL_DISTANCE: 3,
         WAIT_DURATION_MS: 2000,
-        MOVE_SPEED: 0.05,
-        FIRST_SPAWN_LEVEL: 10,
-        SECOND_SPAWN_LEVEL: 15,
-        THIRD_SPAWN_LEVEL: 20
+        CELLS_PER_SECOND: 3,
+        WEB_COLOR: 0xffffff,
+        WEB_WIDTH: 2
     },
 
     // Configuración de power-ups

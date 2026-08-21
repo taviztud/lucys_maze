@@ -92,6 +92,7 @@ function createAtlas(frameCount, frameSize) {
         };
     }
 
+    const frameNames = Object.keys(frames);
     return {
         frames,
         meta: {
@@ -103,8 +104,18 @@ function createAtlas(frameCount, frameSize) {
                 w: layout.columns * frameSize,
                 h: layout.rows * frameSize
             },
-            scale: '1'
-        }
+            scale: '1',
+            lucysMaze: { targetCellRatio: 1 }
+        },
+        anims: [{
+            key: 'player:idle',
+            type: 'frame',
+            frames: frameNames.map((frame) => ({ key: 'player:idle-texture', frame })),
+            frameRate: 6,
+            repeat: -1,
+            yoyo: false,
+            startFrame: 0
+        }]
     };
 }
 
@@ -203,6 +214,9 @@ async function verify() {
         if (!actualAtlas.frames || !actualAtlas.frames[name]) {
             throw new Error(`Missing frame ${name} in ${path.basename(outputAtlasPath)}`);
         }
+    }
+    if (!actualAtlas.anims?.[0] || actualAtlas.anims[0].frames.length !== layout.columns * layout.rows) {
+        throw new Error('Player atlas must include one complete idle animation.');
     }
 
     console.log(`Player sprites verified: ${layout.columns * layout.rows} frames, ${frameSize}x${frameSize}`);

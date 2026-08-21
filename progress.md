@@ -34,6 +34,19 @@ Original prompt: Corregir localmente que el cadáver de Lucy permanezca visible 
 - `EnemyManager` conserva el movimiento y `flipX` del enemigo anterior; `GridRenderer` conserva posiciones y colisión de las trampas, pero Lelar ya no recibe tweens de rotación.
 - TypeScript pasa y el primer smoke test del cliente oficial muestra tres Lelars estáticos con `lelar_idle:idle`, frame avanzado e `isPlaying: true`.
 
+## Evolucion visual, Spider y Studio
+
+- Solicitud actual: centralizar el registro visual, animar Spider, convertir su telarana progresiva en un peligro que bloquea y dana, variar Lelar, reincorporar Spin por nivel y generalizar Studio.
+- Context7 Phaser 3.90 consultado para atlas JSON Hash, `startFrame`, `Graphics.clear`, profundidad, ciclo de escena y parada segura de tweens.
+- `spider_walk` fue promovido a los assets canonicos y ampliado a 2176 px para que los ocho frames sean validos; los PNG auxiliares quedaron en `enemies/source` fuera del runtime.
+- Registro compartido y perfiles visuales centralizados. Spider ya usa animacion, movimiento de 3 celdas/s basado en delta, hilo grafico progresivo y celdas peligrosas; Lucy detiene el slide en el primer peligro.
+- TypeScript pasa despues del primer bloque de gameplay.
+- Ajuste solicitado durante la implementacion: Spider mantiene siempre la orientacion original, su conteo progresa por bandas de diez niveles (1/2/3), y Lelar usa escalas visibles 0.55/0.75/1 con mayor peso en pequeno y medio.
+- Studio comparte el registro runtime, descubre pares, admite carga multiple, rectangulos de atlas, frame inicial y duraciones, y valida rutas/payload antes de guardar. API traversal verificado con respuesta 403.
+- Validacion visual: nivel 10 muestra una Spider sin giro/espejo; nivel 30 muestra tres, hilos blancos, Spin y Lelars de tres tamanos. `render_game_to_text` coincide con las capturas.
+- Validacion final de progresion: nivel 20 genera exactamente dos Spider y nivel 31 exactamente tres; todas reportan `angle: 0`, `flipX: false`, animacion activa y telarana creciente/retractil. En nivel 31 conviven Spin y Lelar con escala 0.55/0.75/1 sin agregar trampas logicas.
+- `npm ci`, `npm run assets:verify`, `npx tsc --noEmit`, `npm run build`, `npm run build:ihost` y `git diff --check` pasan. El juego y Studio cargan sus assets sin 404 ni errores de consola. El proyecto no define scripts separados de lint o tests.
+
 ## TODO Worm y Lelar
 
 - Implementación y documentación completadas. Los atlas tienen ocho frames contiguos y válidos; Worm usa 3 FPS en bucle y Lelar 1 FPS con bucle/yoyo según Studio.

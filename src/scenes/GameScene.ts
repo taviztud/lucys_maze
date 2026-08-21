@@ -5,8 +5,8 @@ import { CONFIG } from '../Config';
 import { InputManager } from '../managers/InputManager';
 import { musicManager, type MusicPlaybackState } from '../managers/MusicManager';
 import { PlayerController } from '../managers/PlayerController';
-import { preloadPlayerAnimations, registerPlayerAnimations } from '../managers/playerAnimations';
-import { preloadEnemyAnimations, registerEnemyAnimations } from '../managers/enemyAnimations';
+import { preloadVisualAssets, registerVisualAnimations } from '../visuals/animations';
+import { getBoardThemes } from '../visuals/levelVisuals';
 import { EnemyManager } from '../managers/EnemyManager';
 import { SpiderManager } from '../managers/SpiderManager';
 import { UIManager } from '../managers/UIManager';
@@ -66,8 +66,12 @@ export class GameScene extends Phaser.Scene {
     preload(): void {
         try {
             // Load images
-            preloadPlayerAnimations(this);
-            preloadEnemyAnimations(this);
+            preloadVisualAssets(this);
+            getBoardThemes().forEach(({ background }) => {
+                if (background && !this.textures.exists(background.textureKey)) {
+                    this.load.image(background.textureKey, background.imageUrl);
+                }
+            });
             this.load.image('player_run', 'lucy_run.png');
             this.load.image('player_die', 'lucy_die.png');
             this.load.image('coin', 'coin_tuto.png');
@@ -75,7 +79,6 @@ export class GameScene extends Phaser.Scene {
             this.load.image('obstacle_rock', 'rock_1.png');
             this.load.image('obstacle_tree', 'tree_1.png');
             this.load.image('exit', 'exit.png');
-            this.load.image('spider', 'enemy_spider.png');
             this.load.image('power_continue', 'power_continue.png');
             this.load.image('power_shield', 'power_shield.png');
 
@@ -85,8 +88,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     create(data?: DevModeData): void {
-        registerPlayerAnimations(this);
-        registerEnemyAnimations(this);
+        registerVisualAnimations(this);
 
         // Initialize all managers and systems
         this.initializeManagers();
@@ -129,7 +131,7 @@ export class GameScene extends Phaser.Scene {
         this.updatePowerUpsUI();
     }
 
-    update(time: number, _delta: number): void {
+    update(time: number, delta: number): void {
         // Global inputs (Available anytime)
         if (this.inputManager.isMenuJustPressed()) {
             this.returnToMenu();
@@ -154,16 +156,12 @@ export class GameScene extends Phaser.Scene {
         if (time > this.lastEnemyUpdateTime + CONFIG.PERFORMANCE.ENEMY_UPDATE_THROTTLE_MS) {
             this.enemyManager.update();
 
-            // Update spiders and check collision
-            const playerPos = this.playerController.getPosition();
-            const playerHit = this.spiderManager.update(time, playerPos);
-            // Only handle hit if not already game over (invincibility is checked in handleDeath)
-            if (playerHit && !this.gameState.isGameOver) {
-                this.handleDeath();
-            }
-
             this.lastEnemyUpdateTime = time;
         }
+
+        const playerPos = this.playerController.getPosition();
+        const playerHit = this.spiderManager.update(time, delta, playerPos);
+        if (playerHit && !this.gameState.isGameOver) this.handleDeath();
     }
 
     /** Concise state used by the automated browser test loop. */
@@ -186,7 +184,10 @@ export class GameScene extends Phaser.Scene {
             },
             exit: this.mazeData.exitPosition,
             coins: this.mazeData.coins,
-            traps: this.mazeData.traps,
+            obstacles: this.mazeData.obstacles,
+            powerUps: { shields: this.shields, continues: this.saves },
+            theme: this.gridRenderer.getThemeState(),
+            traps: this.gridRenderer.getTrapVisualStates(),
             worms: this.enemyManager.getEnemies().map((enemy) => ({
                 x: enemy.x,
                 y: enemy.y,
@@ -195,7 +196,7 @@ export class GameScene extends Phaser.Scene {
                 isPlaying: enemy.sprite?.anims.isPlaying ?? false,
                 flipX: enemy.sprite?.flipX ?? false
             })),
-            lelars: this.gridRenderer.getLelarVisualStates(),
+            spiders: this.spiderManager.getVisualStates(),
             music: {
                 state: musicManager.getState(),
                 track: musicManager.getCurrentTrackId(),

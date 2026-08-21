@@ -37,7 +37,7 @@
   - Phase 3 (35+): Gradual acceleration until max speed at level 54
 - **Background Music:** 26 streamed tracks, Opus-first with MP3 fallback, shuffle playlist, and full controls
 - **Enemies:** Starting from level 5, enemies patrol the maze
-- **Spiders:** New enemy type that patrols between two points (from level 10)
+- **Spiders:** Progressive animated enemy whose growing web blocks and damages Lucy (from level 10)
 - **Developer Mode:** Unlockable menu to set start level, shields, continues, and score
 - **Power-ups:**
   - **Shield:** Absorbs one hit without dying (with invincibility window)

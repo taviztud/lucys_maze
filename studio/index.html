@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucy's Maze - Sprite & Animation Studio</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text y=%2226%22 font-size=%2226%22>🎞️</text></svg>">
+    <link rel="stylesheet" href="../src/studio/styles/studio.css">
+</head>
+<body>
+    <!-- Top Header -->
+    <header class="studio-header">
+        <div class="studio-brand">
+            <span class="studio-title">Lucy's Maze</span>
+            <span class="studio-badge">Sprite Studio</span>
+            <span id="headerAssetTitle" style="font-size: 13px; color: var(--text-secondary); margin-left: 8px;"></span>
+        </div>
+        <div class="header-actions">
+            <button id="btnOpenGame" class="btn btn-sm">Jugar Lucy's Maze</button>
+            <button id="btnCopyJson" class="btn btn-sm">Copiar JSON</button>
+            <button id="btnDownloadJson" class="btn btn-sm">Descargar Atlas</button>
+            <button id="btnSaveToProject" class="btn btn-sm btn-primary">Guardar en Proyecto</button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <main class="studio-layout">
+        <!-- Left Sidebar: Assets & Presets -->
+        <aside class="sidebar-left">
+            <div class="panel-header">
+                <span>Catálogo de Assets</span>
+                <button id="btnRefreshAssets" class="btn btn-sm" title="Recargar lista">Recargar</button>
+            </div>
+            
+            <div id="assetListContainer" class="asset-list">
+                <!-- Populated dynamically via AssetCatalog.ts -->
+            </div>
+
+            <div class="drop-zone" id="fileDropZone">
+                <p>Arrastra pares PNG + JSON</p>
+                <span style="font-size: 10px; color: var(--text-muted);">admite varios atlas a la vez</span>
+                <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,application/json,.json" multiple style="display: none;">
+            </div>
+        </aside>
+
+        <!-- Center Workspace: Interactive Grid Canvas -->
+        <section class="workspace-center">
+            <div class="canvas-toolbar">
+                <div class="toolbar-group">
+                    <button id="btnZoomOut" class="btn btn-sm">-</button>
+                    <span id="labelZoom" style="font-size: 12px; font-family: var(--font-mono); min-width: 40px; text-align: center;">200%</span>
+                    <button id="btnZoomIn" class="btn btn-sm">+</button>
+                    <button id="btnResetZoom" class="btn btn-sm">Reset</button>
+                </div>
+                <div class="toolbar-group">
+                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="checkbox" id="chkShowGrid" checked> Cuadrícula
+                    </label>
+                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; margin-left: 8px;">
+                        <input type="checkbox" id="chkShowNumbers" checked> Índices
+                    </label>
+                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; margin-left: 8px;">
+                        <input type="checkbox" id="chkShowPivot" checked> Pivote
+                    </label>
+                </div>
+            </div>
+
+            <div class="canvas-container" id="canvasContainer">
+                <canvas id="studioCanvas"></canvas>
+            </div>
+        </section>
+
+        <!-- Right Sidebar: Inspector, Timeline, Preview, Scale Comparer -->
+        <aside class="sidebar-right">
+            <!-- Grid Slice Properties -->
+            <div class="section-box">
+                <div class="section-title">
+                    <span>Propiedades de Cuadrícula</span>
+                    <span id="labelDimensions" style="font-size: 10px; color: var(--text-secondary); font-family: var(--font-mono);">0x0 px</span>
+                </div>
+
+                <!-- Wizard and Auto Actions -->
+                <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                    <button id="btnOpenWizard" class="btn btn-sm btn-primary" style="flex: 1;">Asistente de Recorte</button>
+                    <button id="btnAutoTrim" class="btn btn-sm btn-success" title="Ajustar automáticamente a píxeles visibles">Auto-Trim</button>
+                    <button id="btnAutoDetect" class="btn btn-sm" title="Detectar celdas matemáticamente">Auto-Detectar</button>
+                </div>
+
+                <!-- Quick Standard Sizes Chips -->
+                <div style="margin-bottom: 8px;">
+                    <span style="font-size: 10px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase;">Tamaño Rápido (px):</span>
+                    <div id="quickPresetChips" class="preset-chips">
+                        <button class="preset-chip" data-size="16">16x16</button>
+                        <button class="preset-chip" data-size="24">24x24</button>
+                        <button class="preset-chip" data-size="32">32x32</button>
+                        <button class="preset-chip" data-size="48">48x48</button>
+                        <button class="preset-chip" data-size="60">60x60</button>
+                        <button class="preset-chip" data-size="64">64x64</button>
+                        <button class="preset-chip" data-size="128">128x128</button>
+                        <button class="preset-chip" data-size="288">288x288</button>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="inputCols">Columnas</label>
+                        <input type="number" id="inputCols" class="input-field" value="4" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="inputRows">Filas</label>
+                        <input type="number" id="inputRows" class="input-field" value="2" min="1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="inputTargetRatio">Escala por celda</label>
+                        <input type="number" id="inputTargetRatio" class="input-field" value="1" step="0.05" min="0.1" max="2">
+                    </div>
+                    <div class="form-group">
+                        <label for="inputTargetSize">Tama&ntilde;o objetivo (px)</label>
+                        <input type="number" id="inputTargetSize" class="input-field" value="60" min="1" max="240">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="inputFrameW">Ancho Frame (px)</label>
+                        <input type="number" id="inputFrameW" class="input-field" value="288" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="inputFrameH">Alto Frame (px)</label>
+                        <input type="number" id="inputFrameH" class="input-field" value="288" min="1">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="inputOffsetX">Offset X (Izquierda px)</label>
+                        <input type="number" id="inputOffsetX" class="input-field" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="inputOffsetY">Offset Y (Superior px)</label>
+                        <input type="number" id="inputOffsetY" class="input-field" value="0" min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="inputSpacing">Espaciado (px)</label>
+                        <input type="number" id="inputSpacing" class="input-field" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="inputMargin" style="display:none;">Margen</label>
+                        <input type="hidden" id="inputMargin" value="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="inputPivotX">Pivote X (0..1)</label>
+                        <input type="number" id="inputPivotX" class="input-field" value="0.5" step="0.1" min="0" max="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="inputPivotY">Pivote Y (0..1)</label>
+                        <input type="number" id="inputPivotY" class="input-field" value="0.5" step="0.1" min="0" max="1">
+                    </div>
+                </div>
+                <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                    Tip: Mantén <kbd style="background: #252a3a; padding: 1px 4px; border-radius: 3px;">Shift</kbd> y arrastra sobre el canvas para recortar visualmente un área.
+                </div>
+            </div>
+
+            <!-- Animation Manager -->
+            <div class="section-box">
+                <div class="section-title">
+                    <span>Animaciones</span>
+                    <button id="btnAddAnim" class="btn btn-sm">+ Nueva</button>
+                </div>
+                <div id="animTabsContainer" class="anim-tabs">
+                    <!-- Animation tabs populated dynamically -->
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="inputAnimName">Nombre Clave</label>
+                        <input type="text" id="inputAnimName" class="input-field" value="idle">
+                    </div>
+                    <div class="form-group">
+                        <label for="inputAnimFps">Velocidad (FPS)</label>
+                        <input type="number" id="inputAnimFps" class="input-field" value="6" min="1" max="60">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="selectRepeat">Repetición</label>
+                        <select id="selectRepeat" class="input-field">
+                            <option value="-1">Infinito (Bucle)</option>
+                            <option value="0">1 vez (Sin repetición)</option>
+                            <option value="1">2 veces</option>
+                            <option value="2">3 veces</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="justify-content: flex-end; padding-bottom: 4px;">
+                        <label style="font-size: 11px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <input type="checkbox" id="chkAnimYoyo"> Yoyo (Ping-Pong)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="inputAnimStartFrame">Frame inicial</label>
+                        <input type="number" id="inputAnimStartFrame" class="input-field" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="inputFrameDuration">Duracion frame activo (ms)</label>
+                        <input type="number" id="inputFrameDuration" class="input-field" value="0" min="0" step="10">
+                    </div>
+                </div>
+
+                <!-- Timeline Frame Sequence -->
+                <div style="margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label style="font-size: 11px; color: var(--text-secondary); font-weight: 500;">Secuencia de Frames</label>
+                        <button id="btnClearFrames" class="btn btn-sm" style="font-size: 10px; padding: 2px 6px;">Limpiar</button>
+                    </div>
+                    <div id="timelineTrack" class="timeline-track">
+                        <!-- Sequence frame boxes populated dynamically -->
+                    </div>
+                    <span style="font-size: 10px; color: var(--text-muted);">Haz clic en las celdas del canvas central para agregar frames a la animación.</span>
+                </div>
+            </div>
+
+            <!-- Live Preview -->
+            <div class="section-box">
+                <div class="section-title">
+                    <span>Visor en Tiempo Real</span>
+                    <span id="labelFpsCounter" style="font-size: 10px; color: var(--accent-green); font-family: var(--font-mono);">6 FPS</span>
+                </div>
+                <div class="preview-stage">
+                    <div id="previewWrapper" class="preview-canvas-wrapper bg-dark">
+                        <canvas id="previewCanvas" width="128" height="128"></canvas>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; width: 100%; justify-content: center;">
+                        <button id="btnPlayPause" class="btn btn-sm btn-primary" style="min-width: 60px;">Pausar</button>
+                        <button id="btnStepBack" class="btn btn-sm">&lt;</button>
+                        <button id="btnStepForward" class="btn btn-sm">&gt;</button>
+                        <select id="selectPreviewBg" class="input-field" style="width: auto; font-size: 11px;">
+                            <option value="dark">Fondo Oscuro</option>
+                            <option value="checker">Transparente</option>
+                            <option value="neon-blue">Neón Azul</option>
+                            <option value="neon-pink">Neón Rosa</option>
+                            <option value="neon-green">Neón Verde</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scale & Proportion Comparer -->
+            <div class="section-box">
+                <div class="section-title">
+                    <span>Coherencia de Escala (Celda 60px)</span>
+                </div>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
+                    Verifica cómo se escala este sprite dentro del laberinto respecto a la celda del juego y a Lucy.
+                </p>
+                <div class="scale-comparer-stage">
+                    <canvas id="compareCanvas" width="300" height="90"></canvas>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Crop Wizard Modal Dialog -->
+    <div id="cropWizardModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title">Asistente de Recorte Inteligente</span>
+                <button id="btnWizardClose" class="btn-close-modal" title="Cerrar">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="wizardImageInfo" style="font-size: 12px; color: var(--accent-blue); font-family: var(--font-mono);">
+                    Imagen — 0x0 px
+                </div>
+
+                <!-- Suggested Grid Slices -->
+                <div class="wizard-section">
+                    <span class="wizard-section-title">1. Sugerencias Automáticas de División</span>
+                    <div id="wizardSuggestions" class="suggestions-grid">
+                        <!-- Populated dynamically via CropWizard.ts -->
+                    </div>
+                </div>
+
+                <!-- Quick Standard Pixel Sizes -->
+                <div class="wizard-section">
+                    <span class="wizard-section-title">2. Tamaños Estándar Rápidos</span>
+                    <div id="wizardQuickChips" class="chip-group">
+                        <!-- Populated dynamically via CropWizard.ts -->
+                    </div>
+                </div>
+
+                <!-- Preview & Custom Manual Adjustments -->
+                <div class="wizard-section">
+                    <span class="wizard-section-title">3. Previsualización y Ajuste Fino</span>
+                    <div class="wizard-preview-box">
+                        <canvas id="wizardPreviewCanvas"></canvas>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; margin-bottom: 6px;">
+                        <span style="font-size: 11px; color: var(--text-secondary);">Ajuste de dimensiones y posición:</span>
+                        <button id="btnWizardAutoTrim" class="btn btn-sm btn-success" type="button">Auto-Ajustar a Píxeles (Auto-Trim)</button>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wizardInputCols">Columnas</label>
+                            <input type="number" id="wizardInputCols" class="input-field" min="1" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="wizardInputRows">Filas</label>
+                            <input type="number" id="wizardInputRows" class="input-field" min="1" value="1">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wizardInputFw">Ancho Frame (px)</label>
+                            <input type="number" id="wizardInputFw" class="input-field" min="1" value="32">
+                        </div>
+                        <div class="form-group">
+                            <label for="wizardInputFh">Alto Frame (px)</label>
+                            <input type="number" id="wizardInputFh" class="input-field" min="1" value="32">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wizardInputOffsetX">Offset X (Izquierda px)</label>
+                            <input type="number" id="wizardInputOffsetX" class="input-field" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="wizardInputOffsetY">Offset Y (Superior px)</label>
+                            <input type="number" id="wizardInputOffsetY" class="input-field" min="0" value="0">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wizardInputSpacing">Espaciado (px)</label>
+                            <input type="number" id="wizardInputSpacing" class="input-field" min="0" value="0">
+                        </div>
+                        <div class="form-group" style="display:none;">
+                            <input type="hidden" id="wizardInputMargin" value="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btnWizardCancel" class="btn">Cancelar</button>
+                <button id="btnWizardApply" class="btn btn-primary">Aplicar Recorte al Studio</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script type="module" src="../src/studio/main.ts"></script>
+</body>
+</html>

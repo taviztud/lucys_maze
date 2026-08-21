@@ -132,7 +132,7 @@ export class PlayerController {
         this.currentStepCallback = onStepCallback;
         const baseStepDuration = this.calculateStepDuration(level);
         const finalDestination = this.calculateFinalDestination(
-            dx, dy, moveResult, traps, exitPosition, checkEnemyCollision
+            dx, dy, moveResult, traps, exitPosition
         );
 
         this.executeMovementTween(dx, dy, baseStepDuration, finalDestination, traps, exitPosition, checkEnemyCollision, onStepCallback);
@@ -182,8 +182,7 @@ export class PlayerController {
         dy: number,
         moveResult: { x: number; y: number; distance: number },
         traps: Position[],
-        exitPosition: Position,
-        checkEnemyCollision: (x: number, y: number) => boolean
+        exitPosition: Position
     ): { x: number; y: number; step: number } {
         const startX = this.playerPosition.x;
         const startY = this.playerPosition.y;
@@ -193,9 +192,6 @@ export class PlayerController {
             const checkY = startY + (dy * i);
 
             if (this.collision.isTrap(checkX, checkY, traps)) {
-                return { x: checkX, y: checkY, step: i };
-            }
-            if (checkEnemyCollision(checkX, checkY)) {
                 return { x: checkX, y: checkY, step: i };
             }
             if (checkX === exitPosition.x && checkY === exitPosition.y) {
@@ -244,18 +240,9 @@ export class PlayerController {
                         onStepCallback(newX, newY);
 
                         // Check death conditions
-                        if (this.collision.isTrap(newX, newY, traps) ||
-                            checkEnemyCollision(newX, newY)) {
-                            // Emit event - GameScene.handleDeath() will use shield or set gameOver
-                            this.scene.events.emit('player:died');
-                            // After event, check if game is over (shield wasn't available)
-                            // If shield absorbed, continue movement with flash effect
-                            // Access gameState via scene's registry or event result
-                            const gameState = (this.scene as any).gameState;
-                            if (gameState?.isGameOver) {
-                                return; // Real death - stop movement
-                            }
-                            // Shield absorbed - continue movement (flash already triggered in handleDeath)
+                        if (this.collision.isTrap(newX, newY, traps) || checkEnemyCollision(newX, newY)) {
+                            this.stopAtHazard(tween, newX, newY);
+                            return;
                         }
 
                         // Check exit
@@ -276,6 +263,26 @@ export class PlayerController {
                 this.onMovementComplete(finalDestination, traps, exitPosition);
             }
         });
+    }
+
+    /** Stops a slide on the first occupied hazard cell, then delegates damage to GameScene. */
+    private stopAtHazard(tween: Phaser.Tweens.Tween, x: number, y: number): void {
+        tween.stop();
+        this.playerMoveTween = null;
+        this.isMoving = false;
+        this.moveDirection = { dx: 0, dy: 0 };
+        this.trailParticles?.stop();
+        this.playerSprite?.setPosition(
+            x * this.cellSize + this.cellSize / 2,
+            y * this.cellSize + this.cellSize / 2
+        );
+        this.scene.events.emit('player:died');
+
+        const gameState = (this.scene as any).gameState;
+        if (!gameState?.isGameOver && this.playerSprite) {
+            this.setVisualState('idle');
+            this.adjustScaleAndRotation();
+        }
     }
 
     /**

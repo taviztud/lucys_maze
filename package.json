@@ -6,10 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "studio": "vite --open /studio/",
     "audio:convert": "node scripts/audio-assets.mjs convert",
     "audio:verify": "node scripts/audio-assets.mjs verify",
     "sprites:build": "node scripts/player-sprites.mjs build",
-    "sprites:verify": "node scripts/player-sprites.mjs verify",
+    "sprites:verify": "node scripts/player-sprites.mjs verify && node scripts/enemy-sprites.mjs",
     "assets:verify": "npm run audio:verify && npm run sprites:verify",
     "prebuild": "npm run assets:verify",
     "build": "tsc && vite build",

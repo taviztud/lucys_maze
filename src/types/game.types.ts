@@ -40,11 +40,13 @@ export type SpiderState = 'MOVING' | 'WAITING';
  */
 export interface Spider extends Position {
     sprite: Phaser.GameObjects.Sprite | null;
+    webGraphics: Phaser.GameObjects.Graphics | null;
     pointA: Position;
     pointB: Position;
     currentTarget: Position;
     state: SpiderState;
     waitStartTime: number;
+    contactActive: boolean;
 }
 
 /**
@@ -122,10 +124,9 @@ export interface GameConfig {
     SPIDER: {
         MIN_PATROL_DISTANCE: number;
         WAIT_DURATION_MS: number;
-        MOVE_SPEED: number;
-        FIRST_SPAWN_LEVEL: number;
-        SECOND_SPAWN_LEVEL: number;
-        THIRD_SPAWN_LEVEL: number;
+        CELLS_PER_SECOND: number;
+        WEB_COLOR: number;
+        WEB_WIDTH: number;
     };
     POWERUPS: {
         SPAWN_COIN_RATIO: number;
@@ -149,6 +150,9 @@ export interface GameConfig {
 export interface GridSprite extends Phaser.GameObjects.Sprite {
     gridX?: number;
     gridY?: number;
+    trapVariant?: 'lelar' | 'spin';
+    visualScaleMultiplier?: number;
+    spinTween?: Phaser.Tweens.Tween | null;
 }
 
 /**

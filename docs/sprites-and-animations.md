@@ -1,50 +1,64 @@
-# Sprites y animaciones
+# Sprites, animaciones y progresion visual
 
 ## Arquitectura
 
-Lucy’s Maze usa atlas JSON Hash de Phaser. Cada animación se compone de un PNG con la lámina de cuadros y un JSON generado por Studio con tres secciones:
+Lucy’s Maze usa un registro tipado compartido en `src/visuals/assetRegistry.ts`. Contiene los atlas animados de Lucy, Worm, Lelar y Spider, además del asset estático Spin. `src/visuals/animations.ts` es el único punto de preload, registro, reproducción, frame inicial, profundidad y escala por frame.
 
-- `frames`: rectángulo, tamaño, recorte y pivote de cada cuadro.
-- `meta`: nombre del PNG, dimensiones y formato del atlas.
-- `anims`: clave, secuencia de cuadros, FPS, repetición y modo `yoyo`.
+Los perfiles de nivel viven en `src/visuals/levelVisuals.ts`; no se deben duplicar umbrales en managers o renderers. Los atlas del jugador están en `src/assets/sprites/player/` y los enemigos en `src/assets/sprites/enemies/`. Las láminas auxiliares no usadas por el juego viven bajo `source/`.
 
-Los assets animados del jugador viven en `src/assets/sprites/player/`. Los enemigos animados viven en `src/assets/sprites/enemies/`. El PNG y el JSON deben compartir el mismo nombre base, por ejemplo `worm_walk.png` y `worm_walk.json`.
+## Formato Studio / Phaser
 
-`GameScene.preload()` delega la carga. `playerAnimations.ts` administra al jugador y `enemyAnimations.ts` centraliza los atlas de enemigos. Phaser carga el PNG junto con el objeto JSON, registra las animaciones globales una sola vez y los managers solicitan sprites ya configurados. La escala se calcula usando el frame activo, no el tamaño completo de la lámina.
+Cada atlas JSON Hash contiene:
 
-## Studio y el juego
+- `frames`: rectángulos arbitrarios, tamaño de origen y pivote.
+- `meta`: PNG, dimensiones, formato y `lucysMaze.targetCellRatio`.
+- `anims`: clave, secuencia, FPS, repetición, `yoyo`, `startFrame` y duración opcional por frame.
 
-Studio se ejecuta con `npm run studio` y abre `/studio/`. Permite cargar una lámina, definir grilla, pivote, orden de cuadros, FPS, repetición y `yoyo`, además de previsualizar y exportar el atlas.
+Convenciones:
 
-Studio no participa durante la ejecución del juego: produce los datos que Phaser consume. Para promover un enemigo al juego:
+- Archivo: `<entidad>_<estado>.png` y `.json`.
+- Textura: `<entidad>_<estado>`; Lucy conserva `player:idle-texture`.
+- Animación: `<textura>:<estado>`.
+- Frames: `frame_00`, `frame_01`, etc.; Lucy usa `idle_00`, etc.
+- `repeat: -1` significa infinito; `repeat: 0`, una reproducción.
+- El JSON es la fuente de verdad para reproducción, pivote y ratio.
 
-1. Exportar desde Studio el atlas JSON y conservar su PNG original.
-2. Colocar el par en `src/assets/sprites/enemies/` con nombres coincidentes.
-3. Confirmar que `meta.image` coincide con el PNG y que las claves de `anims[].frames[].key` coinciden con la clave de textura.
-4. Registrar el asset en la tabla `DEFINITIONS` de `enemyAnimations.ts` y añadir el nuevo valor a `AnimatedEnemyKind`.
-5. Crear o configurar el sprite desde su manager mediante `createAnimatedEnemySprite` o `configureAnimatedEnemySprite`.
+## Carga y gameplay
 
-El botón de guardado de Studio es una ayuda de desarrollo. Para enemigos usados por el bundle, el par definitivo debe quedar en la ruta canónica anterior.
+1. `GameScene.preload()` llama una vez al loader compartido.
+2. Phaser carga cada PNG junto con su JSON.
+3. `GameScene.create()` registra globalmente solo animaciones inexistentes.
+4. Managers y renderers solicitan sprites por ID; la escala usa frame, celda, ratio del atlas y multiplicador de instancia.
+5. Restart y shutdown destruyen sprites, gráficos y tweens de instancia.
 
-## Convenciones
+Worm conserva movimiento y orientación. Lelar permanece estático, empieza en un frame determinista y usa escala `0.55`, `0.75` o `1`, con mayor peso pequeño/medio. Spin reutiliza exactamente `mazeData.traps`: solo cambia el visual y gira mediante configuración central.
 
-- Archivos: `<enemigo>_<estado>.png` y `<enemigo>_<estado>.json`.
-- Textura: `<enemigo>_<estado>`.
-- Animación: `<enemigo>_<estado>:<animación>`.
-- Frames: `frame_00`, `frame_01`, etc., contiguos y ordenados.
-- `repeat: -1` representa un ciclo infinito; `yoyo: true` reproduce también la secuencia inversa.
-- Los FPS y cuadros del JSON de Studio son la fuente de verdad; no deben repetirse como constantes en los managers.
-- Movimiento, orientación y colisión pertenecen al manager o sistema de gameplay, no al módulo de animación.
+Spider reproduce `spider_walk:idle` sin rotar ni reflejar el asset. Patrulla A↔B a 3 celdas/s, espera 2 segundos y dibuja una línea blanca desde A hasta su posición. Las celdas cubiertas bloquean y dañan a Lucy; el hilo crece al salir y libera celdas al regresar. El contacto reutiliza escudo, invencibilidad y game over.
 
-## Archivos principales
+## Progresion
 
-- `src/managers/enemyAnimations.ts`: carga, registro, reproducción y escala compartida.
-- `src/managers/EnemyManager.ts`: movimiento, orientación y colisión de Worm.
-- `src/systems/GridRenderer.ts`: renderizado de Lelar en las posiciones de trampa.
-- `src/scenes/GameScene.ts`: preload, orquestación y estado textual de prueba.
-- `src/studio/utils/phaserExport.ts`: formato exportado por Studio.
+- Temas: cambian cada 10 niveles usando los cinco colores existentes y luego ciclan. El fondo opcional admite `cover` o `tile`, pero actualmente es `null`.
+- Spin: 0% en 1–10, 10% en 11–20, 20% en 21–30 y 30% desde 31, sin crear trampas.
+- Spider: 0 en 1–9; 1 con alcance 3 en 10–19; 2 con alcance 5 en 20–29; 3 con alcance 7 desde 30.
 
-## Validación
+## Studio
+
+`npm run studio` abre `/studio/`. Studio importa el mismo registro que el juego, consulta la API local para descubrir pares y admite varios PNG/JSON. Edita grilla o rectángulos existentes, offsets, pivote, ratio/tamaño objetivo, secuencia, FPS, duración por frame, frame inicial, repetición y yoyo.
+
+Preview, copiar, descargar y guardar producen el mismo payload. Se validan dimensiones, límites, referencias y reproducción. La API solo escribe en `src/assets/sprites/` o `public/` y existe únicamente en desarrollo; Studio desplegado conserva inspección, preview y descarga.
+
+## Registrar un enemigo
+
+1. Exportar y validar el par PNG/JSON desde Studio.
+2. Guardarlo en `src/assets/sprites/enemies/` con nombres coincidentes.
+3. Añadirlo a `ANIMATED_ASSETS` con categoría, textura, animación y profundidad.
+4. Solicitar el sprite desde su manager mediante la abstracción compartida.
+5. Mantener movimiento, orientación, colisión y daño fuera del registro visual.
+6. Añadirlo a `scripts/enemy-sprites.mjs` si es obligatorio en runtime.
+
+Archivos principales: `src/visuals/assetRegistry.ts`, `src/visuals/animations.ts`, `src/visuals/levelVisuals.ts`, `src/managers/SpiderManager.ts`, `src/systems/GridRenderer.ts` y `src/studio/`.
+
+## Validacion
 
 ```bash
 npm ci
@@ -55,4 +69,4 @@ npm run build:ihost
 git diff --check
 ```
 
-El proyecto no define actualmente comandos separados de lint o tests. Después de los checks se debe probar el juego en navegador, revisar consola y red, observar al menos un ciclo completo de cada animación y comprobar restart, colisiones y cambios de nivel.
+No hay scripts separados de lint o tests. Después se debe usar Dev Mode y el cliente Playwright oficial, inspeccionar capturas, `render_game_to_text`, red y consola, y probar niveles 1, 10, 20, 30 y 31, colisiones, escudo, restart y menú.

@@ -30,6 +30,9 @@ export interface PhaserAtlasMeta {
         h: number;
     };
     scale: string;
+    lucysMaze?: {
+        targetCellRatio: number;
+    };
 }
 
 export interface PhaserAtlasJSON {
@@ -58,12 +61,40 @@ export interface PhaserAnimationJSON {
     yoyo?: boolean;
     showOnStart?: boolean;
     hideOnComplete?: boolean;
+    startFrame?: number;
+}
+
+export type AssetCategory = 'player' | 'enemy' | 'obstacle' | 'powerup' | 'trap' | 'tile';
+
+export type AnimatedAssetId = 'lucy_idle' | 'worm_walk' | 'lelar_idle' | 'spider_walk';
+
+export interface AnimatedAssetDefinition {
+    id: AnimatedAssetId;
+    name: string;
+    category: AssetCategory;
+    textureKey: string;
+    imageUrl: string;
+    atlas: PhaserAtlasJSON;
+    defaultAnimationKey: string;
+    targetCellRatio: number;
+    depth: number;
+}
+
+export interface StaticAssetDefinition {
+    id: 'spin';
+    name: string;
+    category: AssetCategory;
+    textureKey: string;
+    imageUrl: string;
+    targetCellRatio: number;
+    depth: number;
+    rotationDurationMs: number;
 }
 
 export interface SpriteAssetConfig {
     id: string;
     name: string;
-    category: 'player' | 'enemy' | 'obstacle' | 'powerup' | 'trap' | 'tile';
+    category: AssetCategory;
     imagePath: string;
     frameWidth: number;
     frameHeight: number;
