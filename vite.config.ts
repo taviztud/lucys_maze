@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 import { viteAssetApi } from './scripts/plugins/vite-asset-api';
@@ -26,5 +27,9 @@ export default defineConfig({
     server: {
         port: 8080,
         open: true
+    },
+    test: {
+        environment: 'node',
+        include: ['tests/**/*.test.ts']
     }
 });

@@ -57,6 +57,7 @@ export class EnemyManager {
                 y: position.y,
                 direction: this.getRandomDirection(),
                 moving: false,
+                target: null,
                 sprite: null
             };
 
@@ -87,49 +88,48 @@ export class EnemyManager {
      */
     update(): void {
         this.enemies.forEach((enemy, index) => {
-            if (!enemy?.sprite) return;
+            const sprite = enemy.sprite;
+            if (!sprite || enemy.moving) return;
 
-            if (!enemy.moving) {
-                enemy.moving = true;
-                const nextX = enemy.x + enemy.direction.dx;
-                const nextY = enemy.y + enemy.direction.dy;
+            const nextX = enemy.x + enemy.direction.dx;
+            const nextY = enemy.y + enemy.direction.dy;
 
-                // Check wall collision
-                const wallCollision = this.collision.isCollision(nextX, nextY);
-
-                // Check collision with other enemies
-                const enemyCollision = this.checkEnemyAtPosition(nextX, nextY, index);
-
-                if (wallCollision || enemyCollision) {
-                    enemy.direction = this.getRandomDirection();
-                    enemy.moving = false;
-                    enemy.sprite.setFlipX(enemy.direction.dx === -1);
-                } else {
-                    this.scene.tweens.add({
-                        targets: enemy.sprite,
-                        x: nextX * this.cellSize + this.cellSize / 2,
-                        y: nextY * this.cellSize + this.cellSize / 2,
-                        duration: CONFIG.ENEMIES.MOVE_TWEEN_DURATION_MS,
-                        onComplete: () => {
-                            enemy.x = nextX;
-                            enemy.y = nextY;
-                            enemy.moving = false;
-
-                            // Emit collision check event
-                            this.scene.events.emit('enemy:moved', { x: enemy.x, y: enemy.y });
-                        }
-                    });
-                }
+            if (this.collision.isCollision(nextX, nextY) || this.isCellTaken(nextX, nextY, index)) {
+                enemy.direction = this.getRandomDirection();
+                sprite.setFlipX(enemy.direction.dx === -1);
+                return;
             }
+
+            enemy.moving = true;
+            enemy.target = { x: nextX, y: nextY };
+            this.scene.tweens.add({
+                targets: sprite,
+                x: nextX * this.cellSize + this.cellSize / 2,
+                y: nextY * this.cellSize + this.cellSize / 2,
+                duration: CONFIG.ENEMIES.MOVE_TWEEN_DURATION_MS,
+                // La posición lógica acompaña al sprite para que el contacto
+                // coincida con lo que se ve durante todo el movimiento.
+                onUpdate: () => {
+                    enemy.x = (sprite.x - this.cellSize / 2) / this.cellSize;
+                    enemy.y = (sprite.y - this.cellSize / 2) / this.cellSize;
+                },
+                onComplete: () => {
+                    enemy.x = nextX;
+                    enemy.y = nextY;
+                    enemy.target = null;
+                    enemy.moving = false;
+                }
+            });
         });
     }
 
     /**
-     * Verifica si hay otro enemigo en una posición (excluyendo el actual)
+     * Verifica si otro enemigo ocupa o tiene reservada una celda
      */
-    private checkEnemyAtPosition(x: number, y: number, excludeIndex: number): boolean {
+    private isCellTaken(x: number, y: number, excludeIndex: number): boolean {
         return this.enemies.some((e, i) => {
             if (i === excludeIndex) return false;
+            if (e.target && e.target.x === x && e.target.y === y) return true;
             return Math.round(e.x) === x && Math.round(e.y) === y;
         });
     }
@@ -164,26 +164,13 @@ export class EnemyManager {
     }
 
     /**
-     * Actualiza los sprites de enemigos (para flip direction)
-     */
-    updateSprites(): void {
-        this.enemies.forEach(enemy => {
-            if (enemy.sprite) {
-                if (enemy.direction.dx === -1) {
-                    enemy.sprite.setFlipX(true);
-                } else if (enemy.direction.dx === 1) {
-                    enemy.sprite.setFlipX(false);
-                }
-            }
-        });
-    }
-
-    /**
      * Resetea todos los enemigos
      */
     reset(): void {
         this.enemies.forEach(enemy => {
-            if (enemy?.sprite) {
+            if (enemy.sprite) {
+                // Un tween vivo seguiría moviendo la posición lógica del enemigo eliminado.
+                this.scene.tweens.killTweensOf(enemy.sprite);
                 enemy.sprite.destroy();
             }
         });

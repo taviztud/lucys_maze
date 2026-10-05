@@ -1,12 +1,9 @@
 import Phaser from 'phaser';
 import { ANIMATED_ASSETS, getFirstFrame } from '../visuals/assetRegistry';
-import { calculateAnimatedScale, preloadVisualAssets, registerVisualAnimations } from '../visuals/animations';
+import { calculateAnimatedScale } from '../visuals/animations';
 
 export const PLAYER_IDLE_TEXTURE_KEY = ANIMATED_ASSETS.lucy_idle.textureKey;
 export const PLAYER_IDLE_ANIMATION_KEY = ANIMATED_ASSETS.lucy_idle.defaultAnimationKey;
-
-export const preloadPlayerAnimations = preloadVisualAssets;
-export const registerPlayerAnimations = registerVisualAnimations;
 
 export function getFirstIdleFrame(_scene: Phaser.Scene): string | number {
     return getFirstFrame('lucy_idle');

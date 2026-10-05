@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../Config';
 import { calculateSpriteScale } from '../utils/Utils';
-import { configureAnimatedEnemySprite, createAnimatedEnemySprite } from '../managers/enemyAnimations';
+import { configureAnimatedEnemySprite } from '../managers/enemyAnimations';
 import type { Position, Obstacle, SpriteCache, GridSprite, ObstacleSprite } from '../types/game.types';
 import { STATIC_ASSETS, getAnimation } from '../visuals/assetRegistry';
 import { deterministicUnit, getLevelVisualProfile, type BoardTheme } from '../visuals/levelVisuals';
@@ -569,20 +569,6 @@ export class GridRenderer {
     }
 
     /**
-     * Obtiene los sprites de monedas
-     */
-    getCoinSprites(): GridSprite[] {
-        return this.coinSprites;
-    }
-
-    /**
-     * Obtiene los sprites de obstáculos
-     */
-    getObstacleSprites(): ObstacleSprite[] {
-        return this.obstacleSprites;
-    }
-
-    /**
      * Limpia el cache de sprites
      */
     clearCache(): void {
@@ -610,7 +596,8 @@ export class GridRenderer {
         if (this.exitSprite) this.exitSprite.destroy();
         if (this.saveSprite) this.saveSprite.destroy();
         if (this.shieldSprite) this.shieldSprite.destroy();
-        if (this.gridGroup) this.gridGroup.clear(true, true);
+        // En el shutdown de la escena Phaser ya destruyó el grupo y sus hijos.
+        if (this.gridGroup?.children) this.gridGroup.clear(true, true);
         if (this.backgroundObject) this.backgroundObject.destroy();
         if (this.backgroundOverlay) this.backgroundOverlay.destroy();
     }

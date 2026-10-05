@@ -1,7 +1,6 @@
 import { studioStore } from '../state/studioState';
 import {
     calculateImageDivisions,
-    autoDetectGridDimensions,
     scanImageAlphaBounds,
     detectSpriteCountByAlpha,
     type ImageDivisionSuggestion

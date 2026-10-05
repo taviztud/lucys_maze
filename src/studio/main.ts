@@ -18,11 +18,12 @@ import {
 
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize components
-    const canvasGrid = new CanvasGrid('studioCanvas', 'canvasContainer');
-    const animTimeline = new AnimTimeline();
-    const livePreview = new LivePreview();
-    const scaleComparer = new ScaleComparer();
-    const assetCatalog = new AssetCatalog();
+    // Each component wires itself to the DOM and the store when constructed.
+    new CanvasGrid('studioCanvas', 'canvasContainer');
+    new AnimTimeline();
+    new LivePreview();
+    new ScaleComparer();
+    new AssetCatalog();
     const cropWizard = new CropWizard();
 
     // DOM Elements
@@ -175,7 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Slicing Inputs
     const updateGridFromInputs = () => {
-        const state = studioStore.getState();
         const fw = parseInt(inputFrameW.value, 10) || 32;
         const fh = parseInt(inputFrameH.value, 10) || 32;
         const offX = inputOffsetX ? (parseInt(inputOffsetX.value, 10) || 0) : 0;

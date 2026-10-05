@@ -1,4 +1,4 @@
-/* Lucy's Maze - Arcade-style Responsive Layout */
+/* Lucy's Maze - Full-screen canvas shell. HUD and controls are drawn by Phaser. */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -11,257 +11,43 @@ body {
     height: 100%;
     overflow: hidden;
     background: #050505;
-    font-family: 'Press Start 2P', cursive;
+
+    /* The whole page is the play surface: no scroll, pull-to-refresh, zoom or selection. */
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px;
-    min-height: 100vh;
-    min-height: 100dvh;
-}
-
-/* TOP: Info bar - arcade style */
-#info-bar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    color: #ffcc00;
-    background: linear-gradient(180deg, #222 0%, #111 100%);
-    padding: 8px 15px;
-    border: 2px solid #ffcc00;
-    border-radius: 4px;
-    font-size: 10px;
-    text-transform: uppercase;
-    box-shadow: 0 0 10px rgba(255, 204, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    flex-shrink: 0;
-    width: 100%;
-    max-width: 400px;
-}
-
-#score,
-#level {
-    text-shadow: 2px 2px 0 #000;
-}
-
-#powerups {
-    display: flex;
-    gap: 10px;
-    font-size: 10px;
-}
-
-#shields {
-    color: #00bfff;
-    text-shadow: 1px 1px 0 #000;
-}
-
-#continues {
-    color: #ff6b9d;
-    text-shadow: 1px 1px 0 #000;
-}
-
-/* CENTER: Game container - CRT TV effect */
+/* Fills the viewport minus notches and system bars; Phaser sizes the canvas to it. */
 #game-container {
-    /* Constrain max-width to fit within aspect ratio given height constraints */
-    /* Increased buffer to 180px to safely fit controls on all screens */
-    max-width: min(100%, calc((100dvh - 180px) * (480 / 720)));
-
-    width: 100%;
-    height: auto;
-
-    /* Explicitly constrain height as well to prevent rounding overflows */
-    max-height: calc(100dvh - 180px);
-
-    aspect-ratio: 480/720;
-    margin: 0 auto;
-
-    /* FORCE NO BORDER and NO GLOW */
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-
-    background: #000;
-    border-radius: 20px;
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    right: env(safe-area-inset-right, 0px);
+    bottom: env(safe-area-inset-bottom, 0px);
+    left: env(safe-area-inset-left, 0px);
     overflow: hidden;
-    flex-shrink: 0;
+    background: #000;
 }
 
-/* CRT vignette effect on game container */
-#game-container::after {
+#game-container canvas {
+    display: block;
+    touch-action: none;
+}
+
+/* CRT vignette */
+body::before {
     content: "";
-    position: absolute;
+    position: fixed;
     inset: 0;
-    border-radius: 16px;
     background: radial-gradient(ellipse at center,
             transparent 50%,
             rgba(0, 0, 0, 0.3) 80%,
             rgba(0, 0, 0, 0.6) 100%);
     pointer-events: none;
     z-index: 10;
-}
-
-/* BOTTOM: Controls bar */
-#controls-bar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-    background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
-    padding: 8px 16px;
-    border: 1px solid #333;
-    border-radius: 6px;
-    flex-shrink: 0;
-    width: 100%;
-    max-width: 500px;
-}
-
-/* Music controls group */
-#music-controls {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding-right: 16px;
-    border-right: 1px solid #333;
-}
-
-/* Game controls group */
-#game-controls {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-/* Base button styles */
-button {
-    font-family: 'Press Start 2P', cursive;
-    background: #111;
-    color: #888;
-    border: 2px solid #444;
-    padding: 6px 10px;
-    font-size: 10px;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: all 0.15s ease;
-    min-width: 32px;
-}
-
-button:active {
-    transform: scale(0.95);
-}
-
-button:hover {
-    background: #222;
-    color: #fff;
-    border-color: #666;
-}
-
-/* Music control buttons */
-#toggle-music {
-    color: #4ade80;
-    border-color: #4ade80;
-}
-
-#toggle-music:hover {
-    background: #052e16;
-    color: #86efac;
-    border-color: #86efac;
-}
-
-#toggle-music.playing {
-    color: #fbbf24;
-    border-color: #fbbf24;
-}
-
-#toggle-music.playing:hover {
-    background: #451a03;
-    color: #fcd34d;
-    border-color: #fcd34d;
-}
-
-#stop-music {
-    color: #f87171;
-    border-color: #f87171;
-}
-
-#stop-music:hover {
-    background: #450a0a;
-    color: #fca5a5;
-    border-color: #fca5a5;
-}
-
-#next-music {
-    color: #60a5fa;
-    border-color: #60a5fa;
-}
-
-#next-music:hover {
-    background: #172554;
-    color: #93c5fd;
-    border-color: #93c5fd;
-}
-
-/* Game control buttons */
-#menu-button {
-    color: #a78bfa;
-    border-color: #a78bfa;
-}
-
-#menu-button:hover {
-    background: #2e1065;
-    color: #c4b5fd;
-    border-color: #c4b5fd;
-}
-
-#continue-button {
-    color: #2dd4bf;
-    border-color: #2dd4bf;
-}
-
-#continue-button:hover {
-    background: #042f2e;
-    color: #5eead4;
-    border-color: #5eead4;
-}
-
-#restart-button {
-    color: #fb923c;
-    border-color: #fb923c;
-}
-
-#restart-button:hover {
-    background: #431407;
-    color: #fdba74;
-    border-color: #fdba74;
-}
-
-/* Volume slider */
-input[type=range] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 50px;
-    background: transparent;
-    cursor: pointer;
-}
-
-input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 12px;
-    height: 12px;
-    background: #60a5fa;
-    cursor: pointer;
-    margin-top: -4px;
-    border-radius: 2px;
-}
-
-input[type=range]::-webkit-slider-runnable-track {
-    height: 4px;
-    background: #333;
-    border: 1px solid #444;
-    border-radius: 2px;
 }
 
 /* CRT scanline effect */
@@ -273,41 +59,4 @@ body::after {
     background-size: 100% 2px;
     pointer-events: none;
     z-index: 100;
-}
-
-/* Desktop */
-@media (min-width: 640px) {
-    body {
-        padding: 16px;
-    }
-
-    #info-bar {
-        font-size: 12px;
-        padding: 10px 24px;
-        gap: 24px;
-    }
-
-    #controls-bar {
-        gap: 30px;
-        padding: 10px 24px;
-    }
-
-    #music-controls {
-        gap: 8px;
-        padding-right: 24px;
-    }
-
-    #game-controls {
-        gap: 8px;
-    }
-
-    button {
-        padding: 8px 12px;
-        font-size: 11px;
-        min-width: 38px;
-    }
-
-    input[type=range] {
-        width: 70px;
-    }
 }

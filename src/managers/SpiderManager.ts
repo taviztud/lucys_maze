@@ -35,14 +35,14 @@ export class SpiderManager {
         private height: number
     ) {}
 
-    generate(level: number, obstacles: Obstacle[], exitPosition: Position): void {
+    generate(level: number, obstacles: Obstacle[], exitPosition: Position, playerStart: Position): void {
         this.reset();
         this.obstacles = obstacles;
         if (!this.width || !this.height) return;
 
         const profile = getLevelVisualProfile(level).spider;
         for (let index = 0; index < profile.count; index++) {
-            const route = this.findRoute(exitPosition, profile.maxPatrolDistance);
+            const route = this.findRoute(exitPosition, playerStart, profile.maxPatrolDistance);
             if (!route) continue;
 
             const spider: Spider = {
@@ -52,7 +52,7 @@ export class SpiderManager {
                 currentTarget: { ...route.pointB },
                 x: route.pointA.x,
                 y: route.pointA.y,
-                waitStartTime: this.scene.time.now,
+                waitElapsedMs: 0,
                 sprite: null,
                 webGraphics: this.scene.add.graphics().setDepth(5),
                 contactActive: false
@@ -72,28 +72,25 @@ export class SpiderManager {
         }
     }
 
-    update(time: number, deltaMs: number, playerPosition: Position): boolean {
-        let newPlayerContact = false;
-        const safeDeltaSeconds = Math.min(Math.max(deltaMs, 0), 100) / 1000;
+    /** Las esperas se acumulan con delta para que una pausa no las consuma. */
+    update(deltaMs: number, playerPosition: Position): void {
+        const safeDeltaMs = Math.min(Math.max(deltaMs, 0), 100);
 
         for (const spider of this.spiders) {
             if (!spider.sprite) continue;
             if (spider.state === 'WAITING') {
-                if (time - spider.waitStartTime >= CONFIG.SPIDER.WAIT_DURATION_MS) {
+                spider.waitElapsedMs += safeDeltaMs;
+                if (spider.waitElapsedMs >= CONFIG.SPIDER.WAIT_DURATION_MS) {
                     spider.state = 'MOVING';
                 }
             } else {
-                this.moveSpider(spider, CONFIG.SPIDER.CELLS_PER_SECOND * safeDeltaSeconds, time);
+                this.moveSpider(spider, CONFIG.SPIDER.CELLS_PER_SECOND * safeDeltaMs / 1000);
             }
 
             this.drawWeb(spider);
-            const touching = this.isSpiderAt(spider, playerPosition.x, playerPosition.y)
+            spider.contactActive = this.isSpiderAt(spider, playerPosition.x, playerPosition.y)
                 || this.getWebCells(spider).some(({ x, y }) => x === playerPosition.x && y === playerPosition.y);
-            if (touching && !spider.contactActive) newPlayerContact = true;
-            spider.contactActive = touching;
         }
-
-        return newPlayerContact;
     }
 
     checkCollision(playerX: number, playerY: number): boolean {
@@ -120,10 +117,6 @@ export class SpiderManager {
         }));
     }
 
-    getSpiders(): Spider[] {
-        return this.spiders;
-    }
-
     reset(): void {
         for (const spider of this.spiders) {
             spider.sprite?.destroy();
@@ -136,7 +129,11 @@ export class SpiderManager {
         this.reset();
     }
 
-    private findRoute(exitPosition: Position, maxDistance: number): { pointA: Position; pointB: Position } | null {
+    private findRoute(
+        exitPosition: Position,
+        playerStart: Position,
+        maxDistance: number
+    ): { pointA: Position; pointB: Position } | null {
         for (let attempt = 0; attempt < 80; attempt++) {
             const pointA = {
                 x: Phaser.Math.Between(0, this.width - 1),
@@ -153,12 +150,26 @@ export class SpiderManager {
             };
             if (!this.isValidPoint(pointB, exitPosition)) continue;
             if (!this.collision.isPathClear(pointA, pointB, this.obstacles)) continue;
+            if (this.passesNearStart(pointA, pointB, playerStart)) continue;
             return { pointA, pointB };
         }
         return null;
     }
 
-    private moveSpider(spider: Spider, distance: number, time: number): void {
+    /** La ruta completa (y por tanto su telaraña) respeta la zona segura del inicio. */
+    private passesNearStart(pointA: Position, pointB: Position, playerStart: Position): boolean {
+        const dx = Math.sign(pointB.x - pointA.x);
+        const dy = Math.sign(pointB.y - pointA.y);
+        const steps = Math.abs(pointB.x - pointA.x) + Math.abs(pointB.y - pointA.y);
+        for (let step = 0; step <= steps; step++) {
+            const distance = Math.abs(pointA.x + dx * step - playerStart.x)
+                + Math.abs(pointA.y + dy * step - playerStart.y);
+            if (distance <= CONFIG.ENEMIES.SAFE_SPAWN_RADIUS) return true;
+        }
+        return false;
+    }
+
+    private moveSpider(spider: Spider, distance: number): void {
         const dx = spider.currentTarget.x - spider.x;
         const dy = spider.currentTarget.y - spider.y;
         const remaining = Math.abs(dx) + Math.abs(dy);
@@ -166,7 +177,7 @@ export class SpiderManager {
             spider.x = spider.currentTarget.x;
             spider.y = spider.currentTarget.y;
             spider.state = 'WAITING';
-            spider.waitStartTime = time;
+            spider.waitElapsedMs = 0;
             const reachedA = spider.currentTarget.x === spider.pointA.x && spider.currentTarget.y === spider.pointA.y;
             spider.currentTarget = { ...(reachedA ? spider.pointB : spider.pointA) };
         } else {
@@ -212,7 +223,6 @@ export class SpiderManager {
 
     private isValidPoint(point: Position, exitPosition: Position): boolean {
         if (point.x < 0 || point.x >= this.width || point.y < 0 || point.y >= this.height) return false;
-        if (point.x === 0 && point.y === 0) return false;
         if (point.x === exitPosition.x && point.y === exitPosition.y) return false;
         return !this.obstacles.some(({ x, y }) => x === point.x && y === point.y);
     }

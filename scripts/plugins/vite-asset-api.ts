@@ -1,6 +1,12 @@
 import type { Plugin, ViteDevServer } from 'vite';
+import type { IncomingMessage } from 'node:http';
 import { readdir, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+
+// Only these folders can be written through the API.
+const WRITABLE_ROOTS = ['src/assets/sprites', 'public'];
+// Large enough for a base64 sprite sheet, small enough to reject runaway bodies.
+const MAX_BODY_BYTES = 32 * 1024 * 1024;
 
 export function viteAssetApi(): Plugin {
     return {
@@ -42,6 +48,12 @@ export function viteAssetApi(): Plugin {
                 }
 
                 if (url.pathname === '/api/assets/save-json' && req.method === 'POST') {
+                    if (!isTrustedWriteRequest(req)) {
+                        res.statusCode = 403;
+                        res.setHeader('Content-Type', 'application/json');
+                        res.end(JSON.stringify({ success: false, error: 'Cross-site or non-JSON request rejected' }));
+                        return;
+                    }
                     try {
                         const body = await parseJsonBody(req);
                         const { targetPath, content } = body;
@@ -74,10 +86,16 @@ export function viteAssetApi(): Plugin {
                 }
 
                 if (url.pathname === '/api/assets/save-sheet' && req.method === 'POST') {
+                    if (!isTrustedWriteRequest(req)) {
+                        res.statusCode = 403;
+                        res.setHeader('Content-Type', 'application/json');
+                        res.end(JSON.stringify({ success: false, error: 'Cross-site or non-JSON request rejected' }));
+                        return;
+                    }
                     try {
                         const body = await parseJsonBody(req);
                         const { targetPath, base64Data } = body;
-                        if (!targetPath || !base64Data) {
+                        if (!targetPath || typeof base64Data !== 'string' || !base64Data) {
                             res.statusCode = 400;
                             res.end(JSON.stringify({ success: false, error: 'Missing targetPath or base64Data' }));
                             return;
@@ -180,27 +198,57 @@ async function scanFiles(dirPath: string): Promise<string[]> {
     return results;
 }
 
-function resolveWritableAssetPath(rootDir: string, targetPath: unknown): string | null {
+/**
+ * Resolves a project-relative path and accepts it only when the resolved
+ * location is inside one of the writable folders ("public/../x" is not).
+ */
+export function resolveWritableAssetPath(rootDir: string, targetPath: unknown): string | null {
     if (typeof targetPath !== 'string' || path.isAbsolute(targetPath)) return null;
-    const normalized = targetPath.replace(/\\/g, '/');
-    const allowedPrefix = normalized.startsWith('src/assets/sprites/') || normalized.startsWith('public/');
-    if (!allowedPrefix) return null;
-    const resolved = path.resolve(rootDir, normalized);
-    const relative = path.relative(rootDir, resolved);
-    if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
-    return resolved;
+    const resolved = path.resolve(rootDir, targetPath.replace(/\\/g, '/'));
+    const isInsideWritableRoot = WRITABLE_ROOTS.some((root) => {
+        const relative = path.relative(path.resolve(rootDir, root), resolved);
+        return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+    });
+    return isInsideWritableRoot ? resolved : null;
 }
 
-function parseJsonBody(req: any): Promise<any> {
+/**
+ * Writes are accepted only from Studio itself. Requiring a JSON content type
+ * forces a CORS preflight for any other site, and the origin must be this server.
+ */
+export function isTrustedWriteRequest(req: Pick<IncomingMessage, 'headers'>): boolean {
+    const { host, origin } = req.headers;
+    const contentType = String(req.headers['content-type'] ?? '').toLowerCase();
+    if (!contentType.startsWith('application/json')) return false;
+
+    const fetchSite = req.headers['sec-fetch-site'];
+    if (fetchSite !== undefined && fetchSite !== 'same-origin' && fetchSite !== 'none') return false;
+
+    if (origin === undefined) return true;
+    try {
+        return new URL(origin).host === host;
+    } catch {
+        return false;
+    }
+}
+
+function parseJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
     return new Promise((resolve, reject) => {
-        let raw = '';
-        req.on('data', (chunk: any) => {
-            raw += chunk;
+        const chunks: Buffer[] = [];
+        let size = 0;
+        req.on('data', (chunk: Buffer) => {
+            size += chunk.length;
+            if (size > MAX_BODY_BYTES) {
+                reject(new Error('Payload too large'));
+                req.destroy();
+                return;
+            }
+            chunks.push(chunk);
         });
         req.on('end', () => {
             try {
-                resolve(JSON.parse(raw));
-            } catch (err) {
+                resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+            } catch {
                 reject(new Error('Invalid JSON payload'));
             }
         });

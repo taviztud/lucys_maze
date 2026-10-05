@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
+import { getSfxDebugState, playSfx } from '../audio/sfx';
 import { CONFIG } from '../Config';
+import { GameEvents, RegistryKeys, SceneKeys, type GameOverPayload } from '../events';
 
 // Managers
 import { InputManager } from '../managers/InputManager';
-import { musicManager, type MusicPlaybackState } from '../managers/MusicManager';
+import { musicManager } from '../managers/MusicManager';
 import { PlayerController } from '../managers/PlayerController';
-import { preloadVisualAssets, registerVisualAnimations } from '../visuals/animations';
 import { EnemyManager } from '../managers/EnemyManager';
 import { SpiderManager } from '../managers/SpiderManager';
-import { UIManager } from '../managers/UIManager';
 import { GameStateManager } from '../managers/GameStateManager';
 
 // Systems
@@ -16,8 +16,13 @@ import { CollisionSystem } from '../systems/CollisionSystem';
 import { MazeGenerator, type MazeData } from '../systems/MazeGenerator';
 import { GridRenderer } from '../systems/GridRenderer';
 
+import { computeLayout, toPagePoint } from '../ui/layout';
+import { calculateStepDuration } from '../utils/playerSpeed';
 import type { Position, Direction } from '../types/game.types';
 import type { DevModeData } from './MenuScene';
+import type { UIScene } from './UIScene';
+
+type PowerUpKind = 'shield' | 'continue';
 
 /**
  * Escena principal del juego - Actúa como orquestador de todos los managers
@@ -33,7 +38,6 @@ export class GameScene extends Phaser.Scene {
     private playerController!: PlayerController;
     private enemyManager!: EnemyManager;
     private spiderManager!: SpiderManager;
-    private uiManager!: UIManager;
     private gameState!: GameStateManager;
 
     // Systems
@@ -45,44 +49,23 @@ export class GameScene extends Phaser.Scene {
     private mazeData!: MazeData;
     private saves: Position[] = [];      // Continue power-ups
     private shields: Position[] = [];    // Shield power-ups
-    private playerStartPosition: Position = { x: 0, y: 0 };
-    private shieldSpawned: boolean = false;   // Track if shield already spawned this level
-    private continueSpawned: boolean = false; // Track if continue already spawned this level
+    private readonly playerStartPosition: Position = { x: 0, y: 0 };
+    private powerUpSpawned: boolean = false;  // Only one power-up spawns per level
 
-    // Optimization
-    private lastEnemyUpdateTime: number = 0;
-    private requireFreshPressAfterReset: boolean = false;
-    private invincibilityEndTime: number = 0; // Temporal invincibility after shield use
-    private unsubscribeMusicState: (() => void) | null = null;
+    // Remaining invincibility after a shield absorbs a hit. Counted down with
+    // delta so pausing the scene does not consume it.
+    private invincibilityMs: number = 0;
+    private leaving: boolean = false;
 
     constructor() {
-        super('GameScene');
+        super(SceneKeys.GAME);
         this.boardWidth = CONFIG.BOARD_WIDTH;
         this.boardHeight = CONFIG.BOARD_HEIGHT;
         this.cellSize = CONFIG.CELL_SIZE;
     }
 
-    preload(): void {
-        try {
-            // Load images
-            preloadVisualAssets(this);
-            this.load.image('player_run', 'lucy_run.png');
-            this.load.image('player_die', 'lucy_die.png');
-            this.load.image('coin', 'coin_tuto.png');
-            this.load.image('obstacle_brick', 'brick_1.png');
-            this.load.image('obstacle_rock', 'rock_1.png');
-            this.load.image('obstacle_tree', 'tree_1.png');
-            this.load.image('exit', 'exit.png');
-            this.load.image('power_continue', 'power_continue.png');
-            this.load.image('power_shield', 'power_shield.png');
-
-        } catch (error) {
-            console.error('Critical error in preload:', error);
-        }
-    }
-
     create(data?: DevModeData): void {
-        registerVisualAnimations(this);
+        this.leaving = false;
 
         // Initialize all managers and systems
         this.initializeManagers();
@@ -96,66 +79,33 @@ export class GameScene extends Phaser.Scene {
         this.setupEvents();
 
         // Generate initial maze
-        this.startNewGame();
+        this.buildLevel();
 
-        // Setup UI event listeners
-        this.uiManager.setupEventListeners({
-            onMusicToggle: () => {
-                void musicManager.togglePlayPause();
-            },
-            onMusicStop: () => {
-                musicManager.stop();
-            },
-            onVolumeChange: (vol) => musicManager.setVolume(vol),
-            onNextMusic: () => {
-                void musicManager.playNext();
-            },
-            onMenu: () => this.returnToMenu(),
-            onContinue: () => this.handleContinueButton(),
-            onRestart: () => this.handleRestartButton()
-        });
+        this.applyLayout();
+        this.scale.on(Phaser.Scale.Events.RESIZE, this.applyLayout, this);
+        // Phaser only emits this event: it never calls a scene method on its own.
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown, this);
 
-        this.unsubscribeMusicState = musicManager.subscribe((state: MusicPlaybackState) => {
-            this.uiManager.updateMusicButtonState(state === 'loading' || state === 'playing');
-        });
-        this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupMusicIntegration, this);
-
-        // Update initial UI
-        this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
-        this.updatePowerUpsUI();
+        this.syncHud();
+        this.scene.launch(SceneKeys.UI);
+        playSfx(this, 'bark');
     }
 
-    update(time: number, delta: number): void {
-        // Global inputs (Available anytime)
-        if (this.inputManager.isMenuJustPressed()) {
-            this.returnToMenu();
-            return;
+    update(_time: number, delta: number): void {
+        if (this.gameState.isGameOver) return;
+
+        if (this.invincibilityMs > 0) {
+            this.invincibilityMs = Math.max(0, this.invincibilityMs - delta);
         }
 
-        if (this.inputManager.isRestartJustPressed()) {
-            this.handleRestartButton();
-            return;
-        }
-
-        // Handle game over input
-        if (this.gameState.isGameOver) {
-            // C = Continue (only available in game over)
-            if (this.inputManager.isContinueJustPressed()) {
-                this.handleContinueButton();
-            }
-            return;
-        }
-
-        // Update enemies with throttling
-        if (time > this.lastEnemyUpdateTime + CONFIG.PERFORMANCE.ENEMY_UPDATE_THROTTLE_MS) {
-            this.enemyManager.update();
-
-            this.lastEnemyUpdateTime = time;
-        }
+        this.enemyManager.update();
 
         const playerPos = this.playerController.getPosition();
-        const playerHit = this.spiderManager.update(time, delta, playerPos);
-        if (playerHit && !this.gameState.isGameOver) this.handleDeath();
+        this.spiderManager.update(delta, playerPos);
+
+        // Dynamic hazards are checked every frame, so standing on a web or
+        // letting a worm walk into Lucy hurts as soon as invincibility ends.
+        if (this.isDynamicHazard(playerPos.x, playerPos.y)) this.handleDeath();
     }
 
     /** Concise state used by the automated browser test loop. */
@@ -164,15 +114,25 @@ export class GameScene extends Phaser.Scene {
             return JSON.stringify({ mode: 'loading', scene: 'GameScene' });
         }
 
+        const layout = computeLayout(this.scale.width, this.scale.height);
+        const boardTopLeft = toPagePoint(this.scale, layout.boardX, layout.boardY);
+        const boardBottomRight = toPagePoint(
+            this.scale,
+            layout.boardX + layout.boardWidth,
+            layout.boardY + layout.boardHeight
+        );
+        const uiScene = this.scene.get(SceneKeys.UI) as UIScene;
+
         return JSON.stringify({
             coordinateSystem: 'grid origin top-left; x increases right; y increases down',
-            mode: this.gameState.isGameOver ? 'game-over' : 'playing',
+            mode: this.gameState.isGameOver ? 'game-over' : this.scene.isPaused() ? 'paused' : 'playing',
             scene: 'GameScene',
             level: this.gameState.level,
             score: this.gameState.score,
             player: {
                 ...this.playerController.getPosition(),
                 visualState: this.playerController.getVisualState(),
+                moving: this.playerController.getIsMoving(),
                 frame: this.playerController.getCurrentFrameName(),
                 trail: this.playerController.getTrailState()
             },
@@ -180,11 +140,13 @@ export class GameScene extends Phaser.Scene {
             coins: this.mazeData.coins,
             obstacles: this.mazeData.obstacles,
             powerUps: { shields: this.shields, continues: this.saves },
+            inventory: { shields: this.gameState.shieldCount, continues: this.gameState.continueCount },
             theme: this.gridRenderer.getThemeState(),
             traps: this.gridRenderer.getTrapVisualStates(),
             worms: this.enemyManager.getEnemies().map((enemy) => ({
-                x: enemy.x,
-                y: enemy.y,
+                x: Number(enemy.x.toFixed(3)),
+                y: Number(enemy.y.toFixed(3)),
+                target: enemy.target,
                 frame: enemy.sprite?.frame.name ?? null,
                 animation: enemy.sprite?.anims.currentAnim?.key ?? null,
                 isPlaying: enemy.sprite?.anims.isPlaying ?? false,
@@ -193,6 +155,19 @@ export class GameScene extends Phaser.Scene {
                 scaleMultiplier: enemy.sprite?.getData('scaleMultiplier') ?? null
             })),
             spiders: this.spiderManager.getVisualStates(),
+            input: this.inputManager.getDebugState(),
+            ui: this.scene.isActive(SceneKeys.UI) ? uiScene.getDebugState() : null,
+            // Page CSS pixels, so automated tests know where to touch.
+            layout: {
+                viewport: { width: window.innerWidth, height: window.innerHeight },
+                board: {
+                    x: boardTopLeft.x,
+                    y: boardTopLeft.y,
+                    width: boardBottomRight.x - boardTopLeft.x,
+                    height: boardBottomRight.y - boardTopLeft.y
+                }
+            },
+            sfx: getSfxDebugState(this),
             music: {
                 state: musicManager.getState(),
                 track: musicManager.getCurrentTrackId(),
@@ -216,86 +191,69 @@ export class GameScene extends Phaser.Scene {
         this.playerController = new PlayerController(this, this.collision, this.cellSize);
         this.enemyManager = new EnemyManager(this, this.collision, this.cellSize);
         this.spiderManager = new SpiderManager(this, this.collision, this.cellSize, this.boardWidth, this.boardHeight);
-        this.uiManager = new UIManager();
-        this.gameState = new GameStateManager(this);
+        this.gameState = new GameStateManager();
 
         // Setup input
         this.inputManager.setup();
 
-        // Setup turn callbacks for direction change during movement
-        this.playerController.setTurnCallbacks(
-            () => this.inputManager.getDesiredDirection(),
-            (dx, dy) => this.handlePlayerMove({ dx, dy })
-        );
-
-        // Create game over UI
-        this.gameState.createGameOverUI();
+        // The queued turn is applied by the player at the first free cell
+        this.playerController.setDirectionQueue(this.inputManager);
+        this.playerController.create(this.playerStartPosition);
     }
 
     /**
-     * Configura los eventos entre managers
+     * Configura los eventos entre managers y con la UI
      */
     private setupEvents(): void {
-        // Input direction event
-        this.events.on('input:direction', (direction: Direction) => {
-            if (!this.playerController.getIsMoving() &&
-                !this.gameState.isGameOver &&
-                (direction.dx !== 0 || direction.dy !== 0)) {
-                this.handlePlayerMove(direction);
-                this.requireFreshPressAfterReset = false;
-            }
-        });
-
-        // Player events
-        this.events.on('player:died', () => {
-            this.handleDeath();
-        });
-
-        this.events.on('player:reachedExit', () => {
-            this.handleLevelComplete();
-        });
-
-        // Enemy moved event (check collision with player)
-        this.events.on('enemy:moved', (pos: Position) => {
-            const playerPos = this.playerController.getPosition();
-            if (pos.x === playerPos.x && pos.y === playerPos.y) {
-                this.handleDeath();
-            }
-        });
+        this.events.on(GameEvents.INPUT_DIRECTION, this.handleDirectionInput, this);
+        this.events.on(GameEvents.UI_RESTART, this.handleRestart, this);
+        this.events.on(GameEvents.UI_CONTINUE, this.handleContinue, this);
+        this.events.on(GameEvents.UI_MENU, this.returnToMenu, this);
     }
 
     /**
-     * Inicia un nuevo juego
+     * Genera y dibuja un nivel completo para el estado actual de la partida
      */
-    private startNewGame(): void {
+    private buildLevel(): void {
+        // Clear the previous level
+        this.gridRenderer.clearCache();
+        this.enemyManager.reset();
+        this.spiderManager.reset();
+        this.inputManager.clearQueuedDirection();
+        this.invincibilityMs = 0;
+
         // Generate maze
         const exitPosition = this.mazeGenerator.generateRandomExit();
         this.mazeData = this.mazeGenerator.generate(exitPosition);
+
+        // Reset power-up items and spawn flag
         this.saves = [];
+        this.shields = [];
+        this.powerUpSpawned = false;
 
         // Build collision map
         this.collision.build(this.mazeData.obstacles);
-
-        // Store initial coin count
         this.gameState.initialCoinCount = this.mazeData.coins.length;
 
         // Create grid and draw entities
         this.gridRenderer.createGrid(this.gameState.level);
-        this.gridRenderer.drawEntities({
-            coins: this.mazeData.coins,
-            obstacles: this.mazeData.obstacles,
-            traps: this.mazeData.traps,
-            saves: this.saves,
-            shields: this.shields,
-            exitPosition: this.mazeData.exitPosition
+        this.drawEntities();
+
+        // Place the player and hand it the rules of this level
+        this.playerController.reset(this.playerStartPosition);
+        this.playerController.setLevelContext({
+            stepDurationMs: calculateStepDuration(this.gameState.level),
+            exit: this.mazeData.exitPosition,
+            isTrap: (x, y) => this.collision.isTrap(x, y, this.mazeData.traps),
+            isHazard: (x, y) => this.collision.isTrap(x, y, this.mazeData.traps) || this.isDynamicHazard(x, y),
+            onStep: (x, y) => this.processItemsAtPosition(x, y),
+            onHazard: () => this.handleDeath(),
+            onExit: () => this.handleLevelComplete()
         });
 
-        // Create player
-        this.playerController.create(this.playerStartPosition);
-
-        // Initialize enemies (level 5+)
+        // Initialize enemies (level 5+), away from Lucy's first moves
         const excludePositions = [
-            this.playerStartPosition,
+            ...this.getSafeSpawnZone(),
             this.mazeData.exitPosition,
             ...this.mazeData.obstacles,
             ...this.mazeData.traps
@@ -306,23 +264,53 @@ export class GameScene extends Phaser.Scene {
         this.spiderManager.generate(
             this.gameState.level,
             this.mazeData.obstacles,
-            this.mazeData.exitPosition
+            this.mazeData.exitPosition,
+            this.playerStartPosition
         );
     }
 
+    private drawEntities(): void {
+        this.gridRenderer.drawEntities({
+            coins: this.mazeData.coins,
+            obstacles: this.mazeData.obstacles,
+            traps: this.mazeData.traps,
+            saves: this.saves,
+            shields: this.shields,
+            exitPosition: this.mazeData.exitPosition
+        });
+    }
+
+    /** Celdas a distancia Manhattan del inicio que quedan libres de enemigos al generar. */
+    private getSafeSpawnZone(): Position[] {
+        const radius = CONFIG.ENEMIES.SAFE_SPAWN_RADIUS;
+        const { x: startX, y: startY } = this.playerStartPosition;
+        const cells: Position[] = [];
+        for (let y = startY - radius; y <= startY + radius; y++) {
+            for (let x = startX - radius; x <= startX + radius; x++) {
+                if (Math.abs(x - startX) + Math.abs(y - startY) <= radius) cells.push({ x, y });
+            }
+        }
+        return cells;
+    }
+
+    private isDynamicHazard(x: number, y: number): boolean {
+        return this.enemyManager.checkCollision(x, y) || this.spiderManager.checkCollision(x, y);
+    }
+
     /**
-     * Maneja el movimiento del jugador
+     * Aplica una dirección recién pedida. Si Lucy ya se desliza, la dirección
+     * queda en la cola de InputManager y el jugador la toma en la primera
+     * celda libre.
      */
-    private handlePlayerMove(direction: Direction): void {
-        this.playerController.move(
-            direction.dx,
-            direction.dy,
-            this.gameState.level,
-            this.mazeData.traps,
-            this.mazeData.exitPosition,
-            (x, y) => this.enemyManager.checkCollision(x, y) || this.spiderManager.checkCollision(x, y),
-            (x, y) => this.processItemsAtPosition(x, y)
-        );
+    private handleDirectionInput(direction: Direction): void {
+        if (this.gameState.isGameOver || this.leaving) {
+            this.inputManager.clearQueuedDirection();
+            return;
+        }
+        if (this.playerController.getIsMoving()) return;
+
+        this.playerController.move(direction);
+        this.inputManager.clearQueuedDirection();
     }
 
     /**
@@ -333,9 +321,9 @@ export class GameScene extends Phaser.Scene {
         for (let i = this.mazeData.coins.length - 1; i >= 0; i--) {
             if (this.mazeData.coins[i].x === x && this.mazeData.coins[i].y === y) {
                 this.playerController.emitCoinParticles(x, y);
+                playSfx(this, 'coin');
                 this.mazeData.coins.splice(i, 1);
                 this.gameState.addScore(10);
-                this.uiManager.updateScore(this.gameState.score);
                 this.gridRenderer.removeCoin(x, y);
 
                 // Check power-up spawn triggers based on coins collected
@@ -344,15 +332,10 @@ export class GameScene extends Phaser.Scene {
                     const ratio = collected / this.gameState.initialCoinCount;
 
                     // Power-up spawns at configured ratio (only ONE per level)
-                    if (ratio >= CONFIG.POWERUPS.SPAWN_COIN_RATIO && !this.shieldSpawned && !this.continueSpawned) {
+                    if (ratio >= CONFIG.POWERUPS.SPAWN_COIN_RATIO && !this.powerUpSpawned) {
+                        this.powerUpSpawned = true;
                         // Shield has higher probability than continue
-                        if (Math.random() < CONFIG.POWERUPS.SHIELD_PROBABILITY) {
-                            this.generateShieldItem();
-                            this.shieldSpawned = true;
-                        } else {
-                            this.generateSaveItem();
-                            this.continueSpawned = true;
-                        }
+                        this.spawnPowerUp(Math.random() < CONFIG.POWERUPS.SHIELD_PROBABILITY ? 'shield' : 'continue');
                     }
                 }
                 break;
@@ -364,9 +347,9 @@ export class GameScene extends Phaser.Scene {
             const shield = this.shields[0];
             if (shield.x === x && shield.y === y) {
                 this.gameState.addShield();
+                playSfx(this, 'shield');
                 this.shields.splice(0, 1);
                 this.gridRenderer.removeShield();
-                this.updatePowerUpsUI();
             }
         }
 
@@ -375,68 +358,38 @@ export class GameScene extends Phaser.Scene {
             const save = this.saves[0];
             if (save.x === x && save.y === y) {
                 this.gameState.addContinue();
+                playSfx(this, 'continue');
                 this.saves.splice(0, 1);
                 this.gridRenderer.removeSave();
-                this.updatePowerUpsUI();
             }
         }
+
+        this.syncHud();
 
         // Animate nearby trees
         this.gridRenderer.animateNearbyTrees(x, y);
     }
 
     /**
-     * Genera un save item (continue power-up)
+     * Coloca un power-up (escudo o continue) en una celda libre
      */
-    private generateSaveItem(): void {
+    private spawnPowerUp(kind: PowerUpKind): void {
         const excludePositions = [
             this.playerController.getPosition(),
             this.mazeData.exitPosition,
             ...this.mazeData.obstacles,
             ...this.mazeData.traps,
-            ...this.enemyManager.getEnemies().map(e => ({ x: e.x, y: e.y })),
+            ...this.enemyManager.getEnemies().map(e => ({ x: Math.round(e.x), y: Math.round(e.y) })),
+            ...this.saves,
             ...this.shields
         ];
 
         const position = this.mazeGenerator.generateSaveItem(excludePositions);
-        if (position && this.saves.length === 0) {
-            this.saves.push(position);
-            this.gridRenderer.drawEntities({
-                coins: this.mazeData.coins,
-                obstacles: this.mazeData.obstacles,
-                traps: this.mazeData.traps,
-                saves: this.saves,
-                shields: this.shields,
-                exitPosition: this.mazeData.exitPosition
-            });
-        }
-    }
+        if (!position) return;
 
-    /**
-     * Genera un shield item
-     */
-    private generateShieldItem(): void {
-        const excludePositions = [
-            this.playerController.getPosition(),
-            this.mazeData.exitPosition,
-            ...this.mazeData.obstacles,
-            ...this.mazeData.traps,
-            ...this.enemyManager.getEnemies().map(e => ({ x: e.x, y: e.y })),
-            ...this.saves
-        ];
-
-        const position = this.mazeGenerator.generateSaveItem(excludePositions);
-        if (position && this.shields.length === 0) {
-            this.shields.push(position);
-            this.gridRenderer.drawEntities({
-                coins: this.mazeData.coins,
-                obstacles: this.mazeData.obstacles,
-                traps: this.mazeData.traps,
-                saves: this.saves,
-                shields: this.shields,
-                exitPosition: this.mazeData.exitPosition
-            });
-        }
+        (kind === 'shield' ? this.shields : this.saves).push(position);
+        playSfx(this, 'spawn');
+        this.drawEntities();
     }
 
     /**
@@ -450,28 +403,33 @@ export class GameScene extends Phaser.Scene {
         // death sprite is created and tracked for the next reset.
         if (this.gameState.isGameOver) return;
 
-        const currentTime = this.time.now;
-
         // Skip if currently invincible (shield was just used)
-        if (currentTime < this.invincibilityEndTime) {
-            return;
-        }
+        if (this.invincibilityMs > 0) return;
 
         // Try to use shield first
         if (this.gameState.useShield()) {
             // Shield absorbed the hit - flash player and continue movement
             this.playerController.flashInvincibility();
-            this.updatePowerUpsUI();
+            playSfx(this, 'shieldHit');
+            this.syncHud();
             // Set invincibility window to prevent multiple shield consumption
-            this.invincibilityEndTime = currentTime + CONFIG.POWERUPS.SHIELD_INVINCIBILITY_MS;
+            this.invincibilityMs = CONFIG.POWERUPS.SHIELD_INVINCIBILITY_MS;
             return;
         }
 
         // No shield - game over
-        this.gameState.isGameOver = true;
+        const isNewRecord = this.gameState.registerGameOver();
         this.playerController.stopMovement();
         this.playerController.showDeathSprite();
-        this.gameState.showGameOver();
+        playSfx(this, 'death');
+        this.inputManager.clearQueuedDirection();
+
+        const payload: GameOverPayload = {
+            score: this.gameState.score,
+            continues: this.gameState.continueCount,
+            isNewRecord
+        };
+        this.events.emit(GameEvents.GAME_OVER, payload);
     }
 
     /**
@@ -479,130 +437,78 @@ export class GameScene extends Phaser.Scene {
      */
     private handleLevelComplete(): void {
         this.gameState.nextLevel();
-        this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
-        this.playerController.stopMovement();
-        this.requireFreshPressAfterReset = true;
-        this.inputManager.resetDesiredDirection();
-        this.resetGame(false);
+        playSfx(this, 'levelUp');
+        this.buildLevel();
+        this.syncHud();
     }
 
     /**
-     * Resetea el juego
+     * Continue: consume un power-up y reanuda en un laberinto nuevo del mismo nivel
      */
-    private resetGame(fullReset: boolean): void {
-        // Clear caches
-        this.gridRenderer.clearCache();
-        this.enemyManager.reset();
-        this.spiderManager.reset();
-
-        // Generate new maze
-        const exitPosition = this.mazeGenerator.generateRandomExit();
-        this.mazeData = this.mazeGenerator.generate(exitPosition);
-
-        // Reset power-up items and spawn flags
-        this.saves = [];
-        this.shields = [];
-        this.shieldSpawned = false;
-        this.continueSpawned = false;
-
-        // Rebuild collision
-        this.collision.build(this.mazeData.obstacles);
-        this.gameState.initialCoinCount = this.mazeData.coins.length;
-
-        // Redraw
-        this.gridRenderer.createGrid(this.gameState.level);
-        this.gridRenderer.drawEntities({
-            coins: this.mazeData.coins,
-            obstacles: this.mazeData.obstacles,
-            traps: this.mazeData.traps,
-            saves: this.saves,
-            shields: this.shields,
-            exitPosition: this.mazeData.exitPosition
-        });
-
-        // Reset player
-        this.playerController.reset(this.playerStartPosition);
-
-        // Re-init enemies
-        const excludePositions = [
-            this.playerStartPosition,
-            this.mazeData.exitPosition,
-            ...this.mazeData.obstacles,
-            ...this.mazeData.traps
-        ];
-        this.enemyManager.init(this.gameState.level, excludePositions);
-        this.spiderManager.generate(
-            this.gameState.level,
-            this.mazeData.obstacles,
-            this.mazeData.exitPosition
-        );
-
-        // Hide game over UI
-        this.gameState.hideGameOverUI();
+    private handleContinue(): void {
+        if (!this.gameState.useContinue()) return;
+        this.buildLevel();
+        this.syncHud();
+        this.events.emit(GameEvents.GAME_ACTIVE);
     }
 
     /**
-     * Maneja el botón de Continue de UI
+     * Restart: siempre empieza una partida nueva
      */
-    private handleContinueButton(): void {
-        if (this.gameState.isGameOver && this.gameState.useContinue()) {
-            this.gameState.isGameOver = false;
-            this.updatePowerUpsUI();
-            this.resetGame(false);
-        }
+    private handleRestart(): void {
+        if (this.leaving) return;
+        this.gameState.reset();
+        this.buildLevel();
+        this.syncHud();
+        this.events.emit(GameEvents.GAME_ACTIVE);
     }
 
     /**
-     * Maneja el botón de restart de UI (siempre hace full reset)
+     * Publica en el registry los valores que muestra el HUD
      */
-    private handleRestartButton(): void {
-        this.gameState.reset(true);
-        this.updatePowerUpsUI();
-        this.uiManager.updateScoreAndLevel(this.gameState.score, this.gameState.level);
-        this.resetGame(true);
+    private syncHud(): void {
+        this.registry.set(RegistryKeys.SCORE, this.gameState.score);
+        this.registry.set(RegistryKeys.LEVEL, this.gameState.level);
+        this.registry.set(RegistryKeys.SHIELDS, this.gameState.shieldCount);
+        this.registry.set(RegistryKeys.CONTINUES, this.gameState.continueCount);
     }
 
-    /**
-     * Actualiza la UI de power-ups
-     */
-    private updatePowerUpsUI(): void {
-        this.uiManager.updatePowerUps(
-            this.gameState.shieldCount,
-            this.gameState.continueCount
-        );
+    /** Coloca el tablero dentro del canvas expandido sin tocar las coordenadas de grilla. */
+    private applyLayout(): void {
+        const layout = computeLayout(this.scale.width, this.scale.height);
+        this.cameras.main.setScroll(-layout.boardX, -layout.boardY);
     }
-
-
 
     /**
      * Retorna al menú principal
      */
     private returnToMenu(): void {
+        if (this.leaving) return;
+        this.leaving = true;
         musicManager.stop();
-        this.gameState.returnToMenu();
-    }
-
-    private cleanupMusicIntegration(): void {
-        this.unsubscribeMusicState?.();
-        this.unsubscribeMusicState = null;
-        musicManager.stop();
+        this.cameras.main.fadeOut(300, 0, 0, 0);
+        this.time.delayedCall(300, () => {
+            this.scene.start(SceneKeys.MENU);
+        });
     }
 
     /**
-     * Cleanup al destruir la escena
+     * Cleanup al detener la escena (se engancha al evento SHUTDOWN en create)
      */
-    shutdown(): void {
-        this.inputManager?.destroy();
-        this.playerController?.destroy();
-        this.enemyManager?.destroy();
-        this.spiderManager?.destroy();
-        this.uiManager?.destroy();
-        this.gameState?.destroy();
-        this.gridRenderer?.destroy();
+    private handleShutdown(): void {
+        this.scale.off(Phaser.Scale.Events.RESIZE, this.applyLayout, this);
+        this.events.off(GameEvents.INPUT_DIRECTION, this.handleDirectionInput, this);
+        this.events.off(GameEvents.UI_RESTART, this.handleRestart, this);
+        this.events.off(GameEvents.UI_CONTINUE, this.handleContinue, this);
+        this.events.off(GameEvents.UI_MENU, this.returnToMenu, this);
 
-        this.events.off('input:direction');
-        this.events.off('player:died');
-        this.events.off('player:reachedExit');
-        this.events.off('enemy:moved');
+        this.inputManager.destroy();
+        this.playerController.destroy();
+        this.enemyManager.destroy();
+        this.spiderManager.destroy();
+        this.gridRenderer.destroy();
+
+        this.scene.stop(SceneKeys.UI);
+        musicManager.stop();
     }
 }

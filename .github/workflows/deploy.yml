@@ -30,6 +30,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Unit tests
+        run: npm test
+
+      # Type-checks both TypeScript projects before bundling.
       - name: Build
         run: npm run build
 

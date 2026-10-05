@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CONFIG } from '../Config';
+import { playSfx } from '../audio/sfx';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import type { Position, Direction } from '../types/game.types';
 import {
@@ -11,9 +11,32 @@ import {
 
 export type PlayerVisualState = 'idle' | 'running' | 'dead';
 
+/** Cola de giro compartida con el gestor de entrada. */
+export interface DirectionQueue {
+    peekQueuedDirection(): Direction;
+    clearQueuedDirection(): void;
+}
+
+/** Datos y callbacks del nivel actual que necesita el movimiento. */
+export interface PlayerLevelContext {
+    stepDurationMs: number;
+    exit: Position;
+    /** Trampas fijas: el deslizamiento se planifica hasta la primera. */
+    isTrap: (x: number, y: number) => boolean;
+    /** Cualquier peligro presente en la celda ahora mismo (fijo o dinámico). */
+    isHazard: (x: number, y: number) => boolean;
+    onStep: (x: number, y: number) => void;
+    onHazard: () => void;
+    onExit: () => void;
+}
+
+// Absorbe el error de coma flotante al cruzar un número entero de celdas.
+const STEP_EPSILON = 1e-6;
+
 /**
- * Controlador del jugador con movimiento tipo sliding puzzle
- * Soporta cambio de dirección durante el movimiento (turn opportunity)
+ * Controlador del jugador con movimiento tipo sliding puzzle.
+ * Lucy desliza hasta un obstáculo y gira en la primera celda donde la
+ * dirección en cola esté libre, incluida la celda donde se detiene.
  */
 export class PlayerController {
     private scene: Phaser.Scene;
@@ -22,7 +45,12 @@ export class PlayerController {
     private playerPosition: Position = { x: 0, y: 0 };
     private moveDirection: Direction = { dx: 0, dy: 0 };
     private isMoving: boolean = false;
-    private playerMoveTween: Phaser.Tweens.Tween | null = null;
+    private moveTween: Phaser.Tweens.Tween | null = null;
+    // Identifica el deslizamiento vigente para descartar callbacks de uno ya detenido.
+    private moveId: number = 0;
+
+    private context: PlayerLevelContext | null = null;
+    private directionQueue: DirectionQueue | null = null;
 
     // Sprites
     private playerSprite: Phaser.GameObjects.Sprite | null = null;
@@ -33,28 +61,18 @@ export class PlayerController {
     private coinParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
     private trailParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
 
-    // Callbacks for turn opportunity
-    private getDesiredDirection: (() => Direction) | null = null;
-    private onTurnMove: ((dx: number, dy: number) => void) | null = null;
-
-    // Callback for processing items during movement
-    private currentStepCallback: ((x: number, y: number) => void) | null = null;
-
     constructor(scene: Phaser.Scene, collision: CollisionSystem, cellSize: number) {
         this.scene = scene;
         this.collision = collision;
         this.cellSize = cellSize;
     }
 
-    /**
-     * Configura los callbacks para el cambio de dirección durante movimiento
-     */
-    setTurnCallbacks(
-        getDesiredDirection: () => Direction,
-        onTurnMove: (dx: number, dy: number) => void
-    ): void {
-        this.getDesiredDirection = getDesiredDirection;
-        this.onTurnMove = onTurnMove;
+    setDirectionQueue(queue: DirectionQueue): void {
+        this.directionQueue = queue;
+    }
+
+    setLevelContext(context: PlayerLevelContext): void {
+        this.context = context;
     }
 
     /**
@@ -103,292 +121,147 @@ export class PlayerController {
     }
 
     /**
-     * Mueve al jugador en una dirección hasta encontrar un obstáculo
+     * Inicia un deslizamiento si Lucy está quieta.
+     * @returns true si el movimiento comenzó
      */
-    move(
-        dx: number,
-        dy: number,
-        level: number,
-        traps: Position[],
-        exitPosition: Position,
-        checkEnemyCollision: (x: number, y: number) => boolean,
-        onStepCallback: (x: number, y: number) => void
-    ): void {
-        if (this.isMoving || (dx === 0 && dy === 0)) return;
+    move(direction: Direction): boolean {
+        if (this.isMoving || !this.playerSprite) return false;
+        return this.startSlide(direction);
+    }
+
+    private startSlide(direction: Direction): boolean {
+        const context = this.context;
+        const { dx, dy } = direction;
+        if (!context || (dx === 0 && dy === 0)) return false;
+
+        const steps = this.calculateSlideLength(dx, dy, context);
+        if (steps === 0) return false;
+
+        const moveId = ++this.moveId;
+        const origin = { ...this.playerPosition };
+        let processed = 0;
 
         this.moveDirection = { dx, dy };
-        const moveResult = this.collision.calculateMoveUntilObstacle(
-            this.playerPosition.x,
-            this.playerPosition.y,
-            dx, dy
-        );
-
-        if (moveResult.distance === 0) {
-            this.resetMovementState();
-            return;
-        }
-
-        this.startMovement();
-        this.currentStepCallback = onStepCallback;
-        const baseStepDuration = this.calculateStepDuration(level);
-        const finalDestination = this.calculateFinalDestination(
-            dx, dy, moveResult, traps, exitPosition
-        );
-
-        this.executeMovementTween(dx, dy, baseStepDuration, finalDestination, traps, exitPosition, checkEnemyCollision, onStepCallback);
-    }
-
-    /**
-     * Calcula la duración de cada paso basado en el nivel
-     * Fase 1 (niveles 1-10): Aceleración rápida (-20ms por nivel)
-     * Fase 2 (niveles 11-34): Aceleración moderada (-5ms por nivel)
-     * Fase 3 (niveles 35+): Aceleración mínima (-1ms por nivel hasta 60ms)
-     */
-    private calculateStepDuration(level: number): number {
-        const baseMs = CONFIG.PERFORMANCE.PLAYER_BASE_DURATION_MS;            // 400ms
-        const fastDecPerLevel = CONFIG.PERFORMANCE.PLAYER_STEP_DEC_PER_LEVEL; // 20ms
-        const slowDecPerLevel = CONFIG.PERFORMANCE.PLAYER_STEP_DEC_SLOW;      // 5ms
-        const tinyDecPerLevel = CONFIG.PERFORMANCE.PLAYER_STEP_DEC_TINY;      // 1ms
-        const phase1Limit = CONFIG.PERFORMANCE.PLAYER_PHASE1_MAX_LEVEL;       // 10
-        const phase2Limit = CONFIG.PERFORMANCE.PLAYER_PHASE2_MAX_LEVEL;       // 34
-        const minMs = CONFIG.PERFORMANCE.PLAYER_MIN_STEP_DURATION_MS;         // 60ms
-
-        let duration: number;
-
-        if (level <= phase1Limit) {
-            // Fase 1: Aceleración rápida (niveles 1-10)
-            duration = baseMs - level * fastDecPerLevel;
-        } else if (level <= phase2Limit) {
-            // Fase 2: Aceleración moderada (niveles 11-34)
-            const phase1Duration = baseMs - phase1Limit * fastDecPerLevel; // 200ms at level 10
-            const extraLevels = level - phase1Limit;
-            duration = phase1Duration - extraLevels * slowDecPerLevel;
-        } else {
-            // Fase 3: Aceleración mínima (niveles 35+)
-            const phase1Duration = baseMs - phase1Limit * fastDecPerLevel; // 200ms
-            const phase2Duration = phase1Duration - (phase2Limit - phase1Limit) * slowDecPerLevel; // 80ms at level 34
-            const extraLevels = level - phase2Limit;
-            duration = phase2Duration - extraLevels * tinyDecPerLevel;
-        }
-
-        return Math.max(minMs, duration);
-    }
-
-    /**
-     * Calcula el destino final considerando trampas, enemigos y salida
-     */
-    private calculateFinalDestination(
-        dx: number,
-        dy: number,
-        moveResult: { x: number; y: number; distance: number },
-        traps: Position[],
-        exitPosition: Position
-    ): { x: number; y: number; step: number } {
-        const startX = this.playerPosition.x;
-        const startY = this.playerPosition.y;
-
-        for (let i = 1; i <= moveResult.distance; i++) {
-            const checkX = startX + (dx * i);
-            const checkY = startY + (dy * i);
-
-            if (this.collision.isTrap(checkX, checkY, traps)) {
-                return { x: checkX, y: checkY, step: i };
-            }
-            if (checkX === exitPosition.x && checkY === exitPosition.y) {
-                return { x: checkX, y: checkY, step: i };
-            }
-        }
-
-        return { x: moveResult.x, y: moveResult.y, step: moveResult.distance };
-    }
-
-    /**
-     * Ejecuta el tween de movimiento
-     */
-    private executeMovementTween(
-        dx: number,
-        dy: number,
-        baseStepDuration: number,
-        finalDestination: { x: number; y: number; step: number },
-        traps: Position[],
-        exitPosition: Position,
-        checkEnemyCollision: (x: number, y: number) => boolean,
-        onStepCallback: (x: number, y: number) => void
-    ): void {
-        const startX = this.playerPosition.x;
-        const startY = this.playerPosition.y;
-        let lastStepProcessed = -1;
-
-        this.playerMoveTween = this.scene.tweens.add({
-            targets: this.playerSprite,
-            x: finalDestination.x * this.cellSize + this.cellSize / 2,
-            y: finalDestination.y * this.cellSize + this.cellSize / 2,
-            duration: baseStepDuration * finalDestination.step,
-            ease: 'Linear',
-            onUpdate: (tween) => {
-                const progress = tween.progress;
-                const currentStep = Math.floor(progress * finalDestination.step);
-                const stepStart = Math.max(0, lastStepProcessed + 1);
-
-                for (let step = stepStart; step <= currentStep; step++) {
-                    const newX = startX + (dx * step);
-                    const newY = startY + (dy * step);
-
-                    if (newX !== this.playerPosition.x || newY !== this.playerPosition.y) {
-                        this.playerPosition.x = newX;
-                        this.playerPosition.y = newY;
-                        onStepCallback(newX, newY);
-
-                        // Check death conditions
-                        if (this.collision.isTrap(newX, newY, traps) || checkEnemyCollision(newX, newY)) {
-                            this.stopAtHazard(tween, newX, newY);
-                            return;
-                        }
-
-                        // Check exit
-                        if (newX === exitPosition.x && newY === exitPosition.y) {
-                            this.scene.events.emit('player:reachedExit');
-                            return;
-                        }
-
-                        // Check for turn opportunity (original logic)
-                        if (this.checkTurnOpportunity(tween)) {
-                            return;
-                        }
-                    }
-                }
-                lastStepProcessed = currentStep;
-            },
-            onComplete: () => {
-                this.onMovementComplete(finalDestination, traps, exitPosition);
-            }
-        });
-    }
-
-    /** Stops a slide on the first occupied hazard cell, then delegates damage to GameScene. */
-    private stopAtHazard(tween: Phaser.Tweens.Tween, x: number, y: number): void {
-        tween.stop();
-        this.playerMoveTween = null;
-        this.isMoving = false;
-        this.moveDirection = { dx: 0, dy: 0 };
-        this.trailParticles?.stop();
-        this.playerSprite?.setPosition(
-            x * this.cellSize + this.cellSize / 2,
-            y * this.cellSize + this.cellSize / 2
-        );
-        this.scene.events.emit('player:died');
-
-        const gameState = (this.scene as any).gameState;
-        if (!gameState?.isGameOver && this.playerSprite) {
-            this.setVisualState('idle');
-            this.adjustScaleAndRotation();
-        }
-    }
-
-    /**
-     * Verifica si el jugador puede girar en la posición actual
-     * Esta es la lógica original que permite cambiar de dirección durante el movimiento
-     */
-    private checkTurnOpportunity(tween: Phaser.Tweens.Tween): boolean {
-        if (!this.getDesiredDirection || !this.onTurnMove) return false;
-
-        const desiredDirection = this.getDesiredDirection();
-
-        // Check if there's a desired direction different from current move direction
-        if ((desiredDirection.dx !== 0 || desiredDirection.dy !== 0) &&
-            (desiredDirection.dx !== this.moveDirection.dx ||
-                desiredDirection.dy !== this.moveDirection.dy)) {
-
-            const turnNextX = this.playerPosition.x + desiredDirection.dx;
-            const turnNextY = this.playerPosition.y + desiredDirection.dy;
-
-            // If turn direction is not blocked, execute turn
-            if (!this.collision.isCollision(turnNextX, turnNextY)) {
-                // Snap sprite to current grid position
-                this.playerSprite?.setPosition(
-                    this.playerPosition.x * this.cellSize + this.cellSize / 2,
-                    this.playerPosition.y * this.cellSize + this.cellSize / 2
-                );
-
-                // Stop current movement
-                tween.stop();
-                this.isMoving = false;
-
-                // Trigger new movement in desired direction
-                this.onTurnMove(desiredDirection.dx, desiredDirection.dy);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Finaliza el movimiento
-     */
-    private onMovementComplete(
-        finalDestination: { x: number; y: number; step: number },
-        traps: Position[],
-        exitPosition: Position
-    ): void {
-        if (this.trailParticles) this.trailParticles.stop();
-
-        this.playerPosition.x = finalDestination.x;
-        this.playerPosition.y = finalDestination.y;
-
-        if (finalDestination.step > 0) {
-            this.scene.cameras.main.shake(100, 0.005);
-        }
-
-        // Process items at final position (coins, power-ups)
-        if (this.currentStepCallback) {
-            this.currentStepCallback(this.playerPosition.x, this.playerPosition.y);
-        }
-
-        // Check trap at final position
-        if (this.collision.isTrap(this.playerPosition.x, this.playerPosition.y, traps)) {
-            this.scene.events.emit('player:died');
-            // Check if game is over (shield wasn't available)
-            const gameState = (this.scene as any).gameState;
-            if (gameState?.isGameOver) {
-                return; // Real death
-            }
-            // Shield absorbed - continue to reset movement state
-        }
-
-        if (this.playerPosition.x === exitPosition.x &&
-            this.playerPosition.y === exitPosition.y) {
-            this.scene.events.emit('player:reachedExit');
-            return;
-        }
-
-        this.isMoving = false;
-        this.playerMoveTween = null;
-        this.moveDirection = { dx: 0, dy: 0 };
-        this.setVisualState('idle');
-        this.adjustScaleAndRotation();
-    }
-
-    /**
-     * Inicia el estado de movimiento
-     */
-    private startMovement(): void {
         this.isMoving = true;
+        playSfx(this.scene, 'slide');
         this.setVisualState('running');
         this.adjustScaleAndRotation();
-
         if (this.trailParticles && this.playerSprite) {
             this.trailParticles.start();
             this.trailParticles.startFollow(this.playerSprite);
         }
+
+        // Un contador de celdas recorridas: su valor es el del frame actual
+        // (incluido el último), así que cada celda se procesa exactamente una vez.
+        this.moveTween = this.scene.tweens.addCounter({
+            from: 0,
+            to: steps,
+            duration: context.stepDurationMs * steps,
+            ease: 'Linear',
+            onUpdate: (tween) => {
+                if (moveId !== this.moveId) return;
+
+                const travelled = tween.getValue() ?? 0;
+                this.placeSprite(origin.x + dx * travelled, origin.y + dy * travelled);
+
+                const reached = Math.min(steps, Math.floor(travelled + STEP_EPSILON));
+                while (processed < reached && moveId === this.moveId) {
+                    processed++;
+                    this.arriveAt(
+                        origin.x + dx * processed,
+                        origin.y + dy * processed,
+                        processed === steps
+                    );
+                }
+            }
+        });
+
+        return true;
     }
 
-    /**
-     * Resetea el estado de movimiento
-     */
-    private resetMovementState(): void {
+    /** Celdas que recorre el deslizamiento: hasta la pared, la primera trampa o la salida. */
+    private calculateSlideLength(dx: number, dy: number, context: PlayerLevelContext): number {
+        const { x: startX, y: startY } = this.playerPosition;
+        const { distance } = this.collision.calculateMoveUntilObstacle(startX, startY, dx, dy);
+
+        for (let step = 1; step <= distance; step++) {
+            const x = startX + dx * step;
+            const y = startY + dy * step;
+            if (context.isTrap(x, y) || (x === context.exit.x && y === context.exit.y)) return step;
+        }
+
+        return distance;
+    }
+
+    /** Procesa la llegada a una celda: ítems, peligros, salida y giro en cola. */
+    private arriveAt(x: number, y: number, isLastCell: boolean): void {
+        const context = this.context;
+        if (!context) return;
+
+        this.playerPosition = { x, y };
+        context.onStep(x, y);
+
+        if (context.isHazard(x, y)) {
+            this.endSlide();
+            context.onHazard();
+            return;
+        }
+
+        if (x === context.exit.x && y === context.exit.y) {
+            this.endSlide();
+            context.onExit();
+            return;
+        }
+
+        if (this.tryQueuedTurn(x, y)) return;
+
+        if (isLastCell) {
+            this.endSlide();
+            // Un giro que no pudo aplicarse no debe sobrevivir al deslizamiento.
+            this.directionQueue?.clearQueuedDirection();
+            this.scene.cameras.main.shake(100, 0.005);
+            playSfx(this.scene, 'bump');
+        }
+    }
+
+    /** Gira si hay una dirección en cola distinta de la actual y su celda está libre. */
+    private tryQueuedTurn(x: number, y: number): boolean {
+        const queue = this.directionQueue;
+        if (!queue) return false;
+
+        const queued = queue.peekQueuedDirection();
+        if (queued.dx === 0 && queued.dy === 0) return false;
+        if (queued.dx === this.moveDirection.dx && queued.dy === this.moveDirection.dy) return false;
+        if (this.collision.isCollision(x + queued.dx, y + queued.dy)) return false;
+
+        const turn = { ...queued };
+        queue.clearQueuedDirection();
+        this.stopMoveTween();
+        this.placeSprite(x, y);
+        return this.startSlide(turn);
+    }
+
+    /** Detiene el deslizamiento en la celda lógica actual y deja a Lucy en idle. */
+    private endSlide(): void {
+        this.stopMoveTween();
+        this.isMoving = false;
         this.moveDirection = { dx: 0, dy: 0 };
+        this.trailParticles?.stop();
+        this.placeSprite(this.playerPosition.x, this.playerPosition.y);
         this.setVisualState('idle');
         this.adjustScaleAndRotation();
+    }
+
+    private stopMoveTween(): void {
+        this.moveTween?.stop();
+        this.moveTween = null;
+    }
+
+    private placeSprite(gridX: number, gridY: number): void {
+        this.playerSprite?.setPosition(
+            gridX * this.cellSize + this.cellSize / 2,
+            gridY * this.cellSize + this.cellSize / 2
+        );
     }
 
     private setVisualState(state: PlayerVisualState, force = false): void {
@@ -500,6 +373,7 @@ export class PlayerController {
         this.destroyDeathSprite();
         this.visualState = 'dead';
         if (this.playerSprite) {
+            this.scene.tweens.killTweensOf(this.playerSprite);
             this.playerSprite.destroy();
             this.playerSprite = null;
         }
@@ -517,10 +391,8 @@ export class PlayerController {
      * Detiene el movimiento actual
      */
     stopMovement(): void {
-        if (this.playerMoveTween) {
-            this.playerMoveTween.stop();
-            this.playerMoveTween = null;
-        }
+        this.moveId++;
+        this.stopMoveTween();
         this.isMoving = false;
         this.moveDirection = { dx: 0, dy: 0 };
         if (this.trailParticles) this.trailParticles.stop();
@@ -530,16 +402,9 @@ export class PlayerController {
      * Resetea el jugador a una posición
      */
     reset(position: Position): void {
+        this.stopMovement();
         this.playerPosition = { ...position };
-        this.isMoving = false;
-        this.moveDirection = { dx: 0, dy: 0 };
 
-        if (this.playerMoveTween) {
-            this.playerMoveTween.stop();
-            this.playerMoveTween = null;
-        }
-
-        this.trailParticles?.stop();
         this.trailParticles?.killAll();
         this.destroyDeathSprite();
 
@@ -553,10 +418,7 @@ export class PlayerController {
             );
             this.playerSprite.setDepth(10);
         } else {
-            this.playerSprite.setPosition(
-                position.x * this.cellSize + this.cellSize / 2,
-                position.y * this.cellSize + this.cellSize / 2
-            );
+            this.placeSprite(position.x, position.y);
             this.playerSprite.setVisible(true);
         }
 
@@ -569,13 +431,6 @@ export class PlayerController {
      */
     getPosition(): Position {
         return { ...this.playerPosition };
-    }
-
-    /**
-     * Obtiene la dirección actual de movimiento
-     */
-    getMoveDirection(): Direction {
-        return { ...this.moveDirection };
     }
 
     /**
@@ -617,13 +472,6 @@ export class PlayerController {
             alive: this.trailParticles?.getAliveParticleCount() ?? 0,
             orientations: [...orientations.values()]
         };
-    }
-
-    /**
-     * Obtiene el sprite del jugador
-     */
-    getSprite(): Phaser.GameObjects.Sprite | null {
-        return this.playerSprite;
     }
 
     /**

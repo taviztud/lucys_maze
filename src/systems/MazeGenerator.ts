@@ -1,4 +1,3 @@
-import Phaser from 'phaser';
 import { CONFIG } from '../Config';
 import { generateFreePosition } from '../utils/Utils';
 import type { Position, Obstacle } from '../types/game.types';
@@ -86,7 +85,7 @@ export class MazeGenerator {
                 if (Math.random() < CONFIG.MAZE_GENERATION.OBSTACLE_PROBABILITY &&
                     this.hasEnoughSpace(x, y, obstacles, traps)) {
                     const obstacleTypes: Array<'brick' | 'rock' | 'tree'> = ['brick', 'rock', 'tree'];
-                    const randomType = obstacleTypes[Phaser.Math.Between(0, obstacleTypes.length - 1)];
+                    const randomType = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
                     obstacles.push({ x, y, type: randomType });
                 } else if (Math.random() < CONFIG.MAZE_GENERATION.COIN_PROBABILITY) {
                     coins.push({ x, y });
@@ -184,13 +183,5 @@ export class MazeGenerator {
             traps: [],
             exitPosition
         };
-    }
-
-    /**
-     * Actualiza el tamaño del tablero
-     */
-    setBoardDimensions(width: number, height: number): void {
-        this.width = width;
-        this.height = height;
     }
 }

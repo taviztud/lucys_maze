@@ -1,12 +1,25 @@
 import type { GameConfig } from './types/game.types';
 
 export const CONFIG: GameConfig = {
-    // Configuración del juego
+    // Tamaño base del canvas: tablero (480×720) + franja de HUD. Scale.EXPAND
+    // agranda una de las dos dimensiones para cubrir toda la pantalla.
     GAME_WIDTH: 480,
-    GAME_HEIGHT: 720,
+    GAME_HEIGHT: 800,
     BOARD_WIDTH: 8,
     BOARD_HEIGHT: 12,
     CELL_SIZE: 60,
+
+    LAYOUT: {
+        HUD_HEIGHT: 80
+    },
+
+    // Entrada táctil. El umbral se expresa en píxeles CSS para que el gesto
+    // mida lo mismo en el dedo sin importar el tamaño del canvas.
+    INPUT: {
+        SWIPE_THRESHOLD_CSS_PX: 24,
+        SWIPE_AXIS_DOMINANCE: 1.5,
+        ACTIVE_TOUCH_POINTERS: 2
+    },
 
     // Configuraciones de gameplay
     MAZE_GENERATION: {
@@ -19,17 +32,12 @@ export const CONFIG: GameConfig = {
 
     // Configuración de música y audio
     AUDIO: {
-        DEFAULT_VOLUME: 0.5
+        DEFAULT_VOLUME: 0.5,
+        VOLUME_STEP: 0.1
     },
 
     // UI y efectos visuales
     UI: {
-        GAME_OVER_FONT_SIZE: '48px',
-        RESTART_FONT_SIZE: '24px',
-        RESTART_OFFSET_Y: 80,
-        EXIT_BLINK_ALPHA_HIGH: 1,
-        EXIT_BLINK_ALPHA_LOW: 0.3,
-        EXIT_BLINK_INTERVAL: 200,
         FONT_FAMILY: '"Press Start 2P", cursive',
         MAIN_BACKGROUND_COLOR: '#1e1e2e'
     },
@@ -40,13 +48,13 @@ export const CONFIG: GameConfig = {
 
     // Configuración de enemigos
     ENEMIES: {
-        MIN_LEVEL_FOR_TWO: 10,
-        SINGLE_COUNT: 1,
-        DOUBLE_COUNT: 2,
         MOVE_TWEEN_DURATION_MS: 1000,
         FIRST_SPAWN_LEVEL: 5,
         SECOND_ENEMY_INTERVAL: 7,
-        MAX_COUNT: 4
+        MAX_COUNT: 4,
+        // Distancia Manhattan desde el inicio de Lucy que queda libre de
+        // gusanos y de rutas de araña al generar el nivel.
+        SAFE_SPAWN_RADIUS: 2
     },
 
     // Configuración de arañas
@@ -66,8 +74,6 @@ export const CONFIG: GameConfig = {
     },
 
     PERFORMANCE: {
-        INPUT_THROTTLE_MS: 16,
-        ENEMY_UPDATE_THROTTLE_MS: 16,
         PLAYER_MIN_STEP_DURATION_MS: 60,      // Velocidad máxima absoluta
         PLAYER_BASE_DURATION_MS: 400,         // Velocidad inicial
         PLAYER_STEP_DEC_PER_LEVEL: 20,        // Fase 1: -20ms por nivel (1-10)
@@ -75,7 +81,5 @@ export const CONFIG: GameConfig = {
         PLAYER_STEP_DEC_TINY: 1,              // Fase 3: -1ms por nivel (35+)
         PLAYER_PHASE1_MAX_LEVEL: 10,          // Fase 1 termina en nivel 10
         PLAYER_PHASE2_MAX_LEVEL: 34           // Fase 2 termina en nivel 34
-    },
-
-    DEBUG: false
+    }
 };

@@ -1,12 +1,16 @@
 {
   "name": "lucys-maze",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "description": "Lucy's Maze - Un juego estilo Tomb of the Mask con Phaser 3",
   "author": "Gustavo Astudillo P.",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "studio": "vite --open /studio/",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "sfx:export": "vite-node scripts/export-sfx.ts",
     "audio:convert": "node scripts/audio-assets.mjs convert",
     "audio:verify": "node scripts/audio-assets.mjs verify",
     "sprites:build": "node scripts/player-sprites.mjs build",
@@ -14,9 +18,9 @@
     "backgrounds:verify": "node scripts/background-assets.mjs",
     "assets:verify": "npm run audio:verify && npm run sprites:verify && npm run backgrounds:verify",
     "prebuild": "npm run assets:verify",
-    "build": "tsc && vite build",
+    "build": "npm run typecheck && vite build",
     "prebuild:ihost": "npm run assets:verify",
-    "build:ihost": "tsc && vite build --base=/apps/lucys_maze/",
+    "build:ihost": "npm run typecheck && vite build --base=/apps/lucys_maze/",
     "preview": "vite preview"
   },
   "keywords": [
@@ -27,10 +31,13 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^20.19.43",
     "ffmpeg-static": "5.3.0",
     "sharp": "0.35.3",
     "typescript": "^5.3.3",
-    "vite": "^5.0.10"
+    "vite": "^5.0.10",
+    "vitest": "^3.2.7"
   },
   "dependencies": {
     "phaser": "^3.80.1"

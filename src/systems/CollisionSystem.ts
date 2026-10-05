@@ -130,15 +130,6 @@ export class CollisionSystem {
     }
 
     /**
-     * Actualiza el tamaño del tablero
-     */
-    setBoardDimensions(width: number, height: number): void {
-        this.width = width;
-        this.height = height;
-        this.collisionMap = null;
-    }
-
-    /**
      * Obtiene las dimensiones del tablero
      */
     getBoardDimensions(): { width: number; height: number } {

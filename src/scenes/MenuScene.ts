@@ -1,16 +1,17 @@
 import Phaser from 'phaser';
 import packageMetadata from '../../package.json';
+import { playSfx } from '../audio/sfx';
 import { CONFIG } from '../Config';
+import { SceneKeys } from '../events';
 import { ScoreManager } from '../managers/ScoreManager';
 import { musicManager } from '../managers/MusicManager';
 import {
     calculatePlayerVisualScale,
     getFirstIdleFrame,
     PLAYER_IDLE_TEXTURE_KEY,
-    playPlayerIdle,
-    preloadPlayerAnimations,
-    registerPlayerAnimations
+    playPlayerIdle
 } from '../managers/playerAnimations';
+import { computeLayout, toPagePoint } from '../ui/layout';
 
 const GAME_INFO = {
     version: packageMetadata.version,
@@ -25,6 +26,21 @@ export interface DevModeData {
     score: number;
 }
 
+type DevModeField = 'level' | 'shields' | 'continues' | 'score';
+
+interface DevModeRow {
+    key: DevModeField;
+    label: string;
+    min: number;
+    max: number;
+    step?: number;
+}
+
+/** Dev Mode is a development tool: always on in `vite dev`, opt-in with `?dev` elsewhere. */
+function isDevModeAvailable(): boolean {
+    return import.meta.env.DEV || new URLSearchParams(window.location.search).has('dev');
+}
+
 export class MenuScene extends Phaser.Scene {
     private devModeData: DevModeData = {
         enabled: false,
@@ -34,28 +50,34 @@ export class MenuScene extends Phaser.Scene {
         score: 0
     };
 
+    // Todo el menú cuelga de un contenedor centrado; sus hijos usan
+    // coordenadas relativas al centro de la pantalla.
+    private root!: Phaser.GameObjects.Container;
     private devPanel: Phaser.GameObjects.Container | null = null;
-    private devTexts: { [key: string]: Phaser.GameObjects.Text } = {};
+    private devTexts: Partial<Record<DevModeField, Phaser.GameObjects.Text>> = {};
     private playerLogo: Phaser.GameObjects.Sprite | null = null;
+    private starting = false;
+    // Botones expuestos a las pruebas automatizadas mediante render_game_to_text.
+    private readonly debugButtons = new Map<string, Phaser.GameObjects.Text>();
 
     constructor() {
-        super('MenuScene');
-    }
-
-    preload() {
-        preloadPlayerAnimations(this);
+        super(SceneKeys.MENU);
     }
 
     create() {
-        const centerX = CONFIG.GAME_WIDTH / 2;
-        const centerY = CONFIG.GAME_HEIGHT / 2;
-        registerPlayerAnimations(this);
+        this.starting = false;
+        this.devPanel = null;
+        this.devTexts = {};
+        this.debugButtons.clear();
+        // Los valores de Dev Mode se conservan entre visitas, pero JUGAR siempre inicia una partida normal.
+        this.devModeData.enabled = false;
 
         // Background
         this.cameras.main.setBackgroundColor(CONFIG.UI.MAIN_BACKGROUND_COLOR);
+        this.root = this.add.container(0, 0);
 
         // Title - neon theme colors matching the game
-        const title = this.add.text(centerX, centerY - 180, "LUCY'S MAZE", {
+        const title = this.add.text(0, -180, "LUCY'S MAZE", {
             fontSize: '32px',
             fontFamily: CONFIG.UI.FONT_FAMILY,
             color: '#F72585',
@@ -65,8 +87,8 @@ export class MenuScene extends Phaser.Scene {
         title.setOrigin(0.5);
 
         // Subtitle with neon cyan
-        const subtitle = this.add.text(centerX, centerY - 130, '¡Ayuda a Lucy a encontrar la salida!', {
-            fontSize: '14px',
+        const subtitle = this.add.text(0, -130, '¡Ayuda a Lucy a encontrar la salida!', {
+            fontSize: '12px',
             fontFamily: CONFIG.UI.FONT_FAMILY,
             color: '#4CC9F0'
         });
@@ -74,8 +96,8 @@ export class MenuScene extends Phaser.Scene {
 
         // Player sprite as logo
         const playerLogo = this.playerLogo = this.add.sprite(
-            centerX,
-            centerY + 60,
+            0,
+            60,
             PLAYER_IDLE_TEXTURE_KEY,
             getFirstIdleFrame(this)
         );
@@ -101,7 +123,7 @@ export class MenuScene extends Phaser.Scene {
         });
 
         // Play button
-        const playButton = this.add.text(centerX, centerY + 80, '▶ JUGAR', {
+        const playButton = this.add.text(0, 80, '▶ JUGAR', {
             fontSize: '24px',
             fontFamily: CONFIG.UI.FONT_FAMILY,
             color: '#00ff00',
@@ -110,6 +132,7 @@ export class MenuScene extends Phaser.Scene {
         });
         playButton.setOrigin(0.5);
         playButton.setInteractive({ useHandCursor: true });
+        this.debugButtons.set('play', playButton);
 
         // Hover effects
         playButton.on('pointerover', () => {
@@ -120,13 +143,14 @@ export class MenuScene extends Phaser.Scene {
             playButton.setStyle({ color: '#00ff00', backgroundColor: '#003300' });
             playButton.setScale(1);
         });
-        playButton.on('pointerdown', () => {
+        // Releasing (not pressing) is what counts as a user gesture for audio on touch screens.
+        playButton.on('pointerup', () => {
             this.startGame();
         });
 
         // High score display
         const highScore = ScoreManager.getHighScore();
-        const highScoreText = this.add.text(centerX, centerY + 160, `RÉCORD: ${highScore}`, {
+        const highScoreText = this.add.text(0, 160, `RÉCORD: ${highScore}`, {
             fontSize: '16px',
             fontFamily: CONFIG.UI.FONT_FAMILY,
             color: '#ff00ff'
@@ -134,7 +158,7 @@ export class MenuScene extends Phaser.Scene {
         highScoreText.setOrigin(0.5);
 
         // Instructions
-        const instructions = this.add.text(centerX, centerY + 220, 'Usa las flechas ← ↑ → ↓ o desliza', {
+        const instructions = this.add.text(0, 220, 'Usa las flechas ← ↑ → ↓ o desliza', {
             fontSize: '12px',
             fontFamily: CONFIG.UI.FONT_FAMILY,
             color: '#888888'
@@ -143,8 +167,8 @@ export class MenuScene extends Phaser.Scene {
 
         // Version and credits share the package metadata as their single source of truth.
         const gameInfo = this.add.text(
-            centerX,
-            centerY + 265,
+            0,
+            265,
             `VERSIÓN ${GAME_INFO.version}\n${GAME_INFO.credits.toUpperCase()}`,
             {
                 fontSize: '9px',
@@ -156,30 +180,18 @@ export class MenuScene extends Phaser.Scene {
         );
         gameInfo.setOrigin(0.5);
 
-        // Dev Mode button (small, in corner)
-        const devButton = this.add.text(CONFIG.GAME_WIDTH - 10, 10, 'DEV', {
-            fontSize: '12px',
-            fontFamily: CONFIG.UI.FONT_FAMILY,
-            color: '#666666',
-            backgroundColor: '#222222',
-            padding: { x: 8, y: 4 }
-        });
-        devButton.setOrigin(1, 0);
-        devButton.setInteractive({ useHandCursor: true });
-        devButton.on('pointerover', () => devButton.setStyle({ color: '#ffffff' }));
-        devButton.on('pointerout', () => devButton.setStyle({ color: '#666666' }));
-        devButton.on('pointerdown', () => this.toggleDevPanel());
+        this.root.add([title, subtitle, playerLogo, playButton, highScoreText, instructions, gameInfo]);
+
+        if (isDevModeAvailable()) this.createDevButton();
 
         // Allow starting with Enter or Space
-        this.input.keyboard.on('keydown-ENTER', () => this.startGame());
-        this.input.keyboard.on('keydown-SPACE', () => this.startGame());
+        this.input.keyboard?.on('keydown-ENTER', () => this.startGame());
+        this.input.keyboard?.on('keydown-SPACE', () => this.startGame());
 
-        // Touch to start
-        this.input.on('pointerdown', (pointer) => {
-            // Only start if not clicking the button
-            if (pointer.y < centerY + 50 || pointer.y > centerY + 120) {
-                // Do nothing, let button handle it
-            }
+        this.applyLayout();
+        this.scale.on(Phaser.Scale.Events.RESIZE, this.applyLayout, this);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.scale.off(Phaser.Scale.Events.RESIZE, this.applyLayout, this);
         });
     }
 
@@ -193,6 +205,8 @@ export class MenuScene extends Phaser.Scene {
                 animation: this.playerLogo?.anims.currentAnim?.key ?? null
             },
             info: GAME_INFO,
+            devMode: isDevModeAvailable() ? { ...this.devModeData, panelOpen: this.devPanel !== null } : null,
+            buttons: this.getDebugButtons(),
             music: {
                 state: musicManager.getState(),
                 track: musicManager.getCurrentTrackId(),
@@ -202,6 +216,40 @@ export class MenuScene extends Phaser.Scene {
         });
     }
 
+    /** Centre of every live button, in page CSS pixels. */
+    private getDebugButtons(): Record<string, { x: number; y: number }> {
+        const buttons: Record<string, { x: number; y: number }> = {};
+        this.debugButtons.forEach((button, name) => {
+            if (!button.active) return;
+            const bounds = button.getBounds();
+            buttons[name] = toPagePoint(this.scale, bounds.centerX, bounds.centerY);
+        });
+        return buttons;
+    }
+
+    private applyLayout(): void {
+        const layout = computeLayout(this.scale.width, this.scale.height);
+        this.root.setPosition(layout.centerX, layout.centerY);
+    }
+
+    /** Dev Mode button, anchored to the top-right corner of the base area. */
+    private createDevButton(): void {
+        const devButton = this.add.text(CONFIG.GAME_WIDTH / 2 - 10, -CONFIG.GAME_HEIGHT / 2 + 10, 'DEV', {
+            fontSize: '12px',
+            fontFamily: CONFIG.UI.FONT_FAMILY,
+            color: '#666666',
+            backgroundColor: '#222222',
+            padding: { x: 8, y: 4 }
+        });
+        devButton.setOrigin(1, 0);
+        devButton.setInteractive({ useHandCursor: true });
+        devButton.on('pointerover', () => devButton.setStyle({ color: '#ffffff' }));
+        devButton.on('pointerout', () => devButton.setStyle({ color: '#666666' }));
+        devButton.on('pointerdown', () => this.toggleDevPanel());
+        this.root.add(devButton);
+        this.debugButtons.set('dev', devButton);
+    }
+
     private toggleDevPanel(): void {
         if (this.devPanel) {
             this.devPanel.destroy();
@@ -209,10 +257,8 @@ export class MenuScene extends Phaser.Scene {
             return;
         }
 
-        const panelX = CONFIG.GAME_WIDTH / 2;
-        const panelY = CONFIG.GAME_HEIGHT / 2;
-
-        this.devPanel = this.add.container(panelX, panelY);
+        const devPanel = this.devPanel = this.add.container(0, 0);
+        this.root.add(devPanel);
 
         // Panel background
         const bg = this.add.graphics();
@@ -220,7 +266,7 @@ export class MenuScene extends Phaser.Scene {
         bg.fillRoundedRect(-150, -130, 300, 260, 10);
         bg.lineStyle(2, 0x4CC9F0);
         bg.strokeRoundedRect(-150, -130, 300, 260, 10);
-        this.devPanel.add(bg);
+        devPanel.add(bg);
 
         // Title
         const title = this.add.text(0, -110, 'DEV MODE', {
@@ -229,10 +275,10 @@ export class MenuScene extends Phaser.Scene {
             color: '#4CC9F0'
         });
         title.setOrigin(0.5);
-        this.devPanel.add(title);
+        devPanel.add(title);
 
         // Create value rows
-        const rows = [
+        const rows: DevModeRow[] = [
             { key: 'level', label: 'Nivel', min: 1, max: 50 },
             { key: 'shields', label: 'Shields', min: 0, max: 10 },
             { key: 'continues', label: 'Continues', min: 0, max: 10 },
@@ -241,6 +287,7 @@ export class MenuScene extends Phaser.Scene {
 
         rows.forEach((row, index) => {
             const y = -60 + index * 45;
+            const step = row.step ?? 1;
 
             // Label
             const label = this.add.text(-120, y, row.label, {
@@ -248,7 +295,7 @@ export class MenuScene extends Phaser.Scene {
                 fontFamily: CONFIG.UI.FONT_FAMILY,
                 color: '#ffffff'
             });
-            this.devPanel!.add(label);
+            devPanel.add(label);
 
             // Minus button
             const minus = this.add.text(30, y, '-', {
@@ -260,21 +307,21 @@ export class MenuScene extends Phaser.Scene {
             });
             minus.setInteractive({ useHandCursor: true });
             minus.on('pointerdown', () => {
-                const step = row.step || 1;
-                (this.devModeData as any)[row.key] = Math.max(row.min, (this.devModeData as any)[row.key] - step);
+                this.devModeData[row.key] = Math.max(row.min, this.devModeData[row.key] - step);
                 this.updateDevText(row.key);
             });
-            this.devPanel!.add(minus);
+            devPanel.add(minus);
+            this.debugButtons.set(`${row.key}Minus`, minus);
 
             // Value
-            const value = this.add.text(75, y, String((this.devModeData as any)[row.key]), {
+            const value = this.add.text(75, y, String(this.devModeData[row.key]), {
                 fontSize: '14px',
                 fontFamily: CONFIG.UI.FONT_FAMILY,
                 color: '#00ff00'
             });
             value.setOrigin(0.5, 0);
             this.devTexts[row.key] = value;
-            this.devPanel!.add(value);
+            devPanel.add(value);
 
             // Plus button
             const plus = this.add.text(100, y, '+', {
@@ -286,11 +333,11 @@ export class MenuScene extends Phaser.Scene {
             });
             plus.setInteractive({ useHandCursor: true });
             plus.on('pointerdown', () => {
-                const step = row.step || 1;
-                (this.devModeData as any)[row.key] = Math.min(row.max, (this.devModeData as any)[row.key] + step);
+                this.devModeData[row.key] = Math.min(row.max, this.devModeData[row.key] + step);
                 this.updateDevText(row.key);
             });
-            this.devPanel!.add(plus);
+            devPanel.add(plus);
+            this.debugButtons.set(`${row.key}Plus`, plus);
         });
 
         // Apply button
@@ -305,27 +352,28 @@ export class MenuScene extends Phaser.Scene {
         applyBtn.setInteractive({ useHandCursor: true });
         applyBtn.on('pointerover', () => applyBtn.setStyle({ backgroundColor: '#006600' }));
         applyBtn.on('pointerout', () => applyBtn.setStyle({ backgroundColor: '#004400' }));
-        applyBtn.on('pointerdown', () => {
+        applyBtn.on('pointerup', () => {
             this.devModeData.enabled = true;
             this.startGame();
         });
-        this.devPanel.add(applyBtn);
-
-        this.devPanel.setDepth(100);
+        devPanel.add(applyBtn);
+        this.debugButtons.set('devApply', applyBtn);
     }
 
-    private updateDevText(key: string): void {
-        if (this.devTexts[key]) {
-            this.devTexts[key].setText(String((this.devModeData as any)[key]));
-        }
+    private updateDevText(key: DevModeField): void {
+        this.devTexts[key]?.setText(String(this.devModeData[key]));
     }
 
     startGame() {
+        if (this.starting) return;
+        this.starting = true;
+
+        playSfx(this, 'ui');
         // Start from the trusted user gesture. Audio loading never blocks the scene transition.
         void musicManager.start();
         this.cameras.main.fadeOut(300, 0, 0, 0);
         this.time.delayedCall(300, () => {
-            this.scene.start('GameScene', this.devModeData.enabled ? this.devModeData : null);
+            this.scene.start(SceneKeys.GAME, this.devModeData.enabled ? { ...this.devModeData } : undefined);
         });
     }
 }

@@ -3,8 +3,6 @@ import type { AnimatedAssetId } from '../types/animation.types';
 import {
     configureAnimatedSprite,
     createAnimatedSprite,
-    preloadVisualAssets,
-    registerVisualAnimations,
     type ConfigureAnimatedSpriteOptions
 } from '../visuals/animations';
 
@@ -15,9 +13,6 @@ const ASSET_BY_KIND: Record<AnimatedEnemyKind, AnimatedAssetId> = {
     lelar: 'lelar_idle',
     spider: 'spider_walk'
 };
-
-export const preloadEnemyAnimations = preloadVisualAssets;
-export const registerEnemyAnimations = registerVisualAnimations;
 
 export function createAnimatedEnemySprite(
     scene: Phaser.Scene,

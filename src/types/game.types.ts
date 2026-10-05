@@ -27,6 +27,8 @@ export interface Obstacle extends Position {
 export interface Enemy extends Position {
     direction: Direction;
     moving: boolean;
+    /** Cell reserved while the move tween runs; x/y follow the sprite. */
+    target: Position | null;
     sprite: Phaser.GameObjects.Sprite | null;
 }
 
@@ -45,22 +47,8 @@ export interface Spider extends Position {
     pointB: Position;
     currentTarget: Position;
     state: SpiderState;
-    waitStartTime: number;
+    waitElapsedMs: number;
     contactActive: boolean;
-}
-
-/**
- * Move calculation result
- */
-export interface MoveResult extends Position {
-    distance: number;
-}
-
-/**
- * Final destination for player movement with step count
- */
-export interface FinalDestination extends Position {
-    step: number;
 }
 
 /**
@@ -73,15 +61,6 @@ export interface SpriteCache {
 }
 
 /**
- * Event listener cleanup entry
- */
-export interface EventListenerEntry {
-    element: HTMLElement;
-    event: string;
-    handler: EventListener;
-}
-
-/**
  * Game configuration structure
  */
 export interface GameConfig {
@@ -90,6 +69,14 @@ export interface GameConfig {
     BOARD_WIDTH: number;
     BOARD_HEIGHT: number;
     CELL_SIZE: number;
+    LAYOUT: {
+        HUD_HEIGHT: number;
+    };
+    INPUT: {
+        SWIPE_THRESHOLD_CSS_PX: number;
+        SWIPE_AXIS_DOMINANCE: number;
+        ACTIVE_TOUCH_POINTERS: number;
+    };
     MAZE_GENERATION: {
         OBSTACLE_PROBABILITY: number;
         COIN_PROBABILITY: number;
@@ -99,27 +86,20 @@ export interface GameConfig {
     };
     AUDIO: {
         DEFAULT_VOLUME: number;
+        VOLUME_STEP: number;
     };
     UI: {
-        GAME_OVER_FONT_SIZE: string;
-        RESTART_FONT_SIZE: string;
-        RESTART_OFFSET_Y: number;
-        EXIT_BLINK_ALPHA_HIGH: number;
-        EXIT_BLINK_ALPHA_LOW: number;
-        EXIT_BLINK_INTERVAL: number;
         FONT_FAMILY: string;
         MAIN_BACKGROUND_COLOR: string;
     };
     BACKGROUND_COLORS: number[];
     GRID_ALPHA: number;
     ENEMIES: {
-        MIN_LEVEL_FOR_TWO: number;
-        SINGLE_COUNT: number;
-        DOUBLE_COUNT: number;
         MOVE_TWEEN_DURATION_MS: number;
         FIRST_SPAWN_LEVEL: number;
         SECOND_ENEMY_INTERVAL: number;
         MAX_COUNT: number;
+        SAFE_SPAWN_RADIUS: number;
     };
     SPIDER: {
         MIN_PATROL_DISTANCE: number;
@@ -134,8 +114,6 @@ export interface GameConfig {
         SHIELD_INVINCIBILITY_MS: number;
     };
     PERFORMANCE: {
-        INPUT_THROTTLE_MS: number;
-        ENEMY_UPDATE_THROTTLE_MS: number;
         PLAYER_MIN_STEP_DURATION_MS: number;
         PLAYER_BASE_DURATION_MS: number;
         PLAYER_STEP_DEC_PER_LEVEL: number;
@@ -144,7 +122,6 @@ export interface GameConfig {
         PLAYER_PHASE1_MAX_LEVEL: number;
         PLAYER_PHASE2_MAX_LEVEL: number;
     };
-    DEBUG: boolean;
 }
 
 export interface GridSprite extends Phaser.GameObjects.Sprite {

@@ -30,13 +30,6 @@ export class ScoreManager {
     }
 
     /**
-     * Check if a score is a new high score
-     */
-    static isNewHighScore(score: number): boolean {
-        return score > this.getHighScore();
-    }
-
-    /**
      * Reset the high score (for testing)
      */
     static reset(): void {
